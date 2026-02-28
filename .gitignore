@@ -3,7 +3,8 @@
 Thumbs.db
 desktop.ini
 
-# IDE
+# IDE and AI/editor tooling (do not commit to GitHub)
+.cursor/
 .vscode/
 .idea/
 *.swp

@@ -17,7 +17,7 @@ Thank you for your interest in contributing!
 ## Getting started
 
 **Requirements:**
-- Go 1.22+
+- Go 1.25+
 
 ```bash
 git clone https://github.com/muxover/snare.git
