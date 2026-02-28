@@ -28,7 +28,7 @@ Snare is a single-binary CLI for engineers who need to **inspect and replay HTTP
 
 ## 📦 Installation
 
-**Requires Go 1.22+.**
+**Requires Go 1.25+.**
 
 ```bash
 git clone https://github.com/muxover/snare.git
