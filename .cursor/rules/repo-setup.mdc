@@ -1,0 +1,677 @@
+---
+description: Repository setup conventions — README, changelog, release notes, contributing, license, .gitignore, and GitHub Actions for public and private repos.
+alwaysApply: true
+---
+
+# Repository Setup Conventions
+
+When setting up a new repository or adding repo scaffolding, follow these rules exactly. There are two modes: **Public** and **Private**. If the user hasn't specified which, **ask**.
+
+---
+
+## When to Ask Questions
+
+Before scaffolding, if any of the following are unknown, present a numbered list of questions:
+
+1. **Public or Private?** — Determines which files to create.
+2. **Project name and one-line description** — For README header and badges.
+3. **Language / framework** — Determines .gitignore, CI, and install instructions.
+4. **License type** (public only) — MIT, Apache-2.0, etc.
+5. **GitHub org/user and repo name** — For badge URLs, links, and Actions.
+6. **Initial version** — e.g. `v0.1.0` or `v1.0.0`.
+7. **Does the project have a hosted docs site or pkg registry?** — For badges/links and GitHub Pages Action.
+8. **Does the project need build artifacts on release?** (binaries, crates, npm packages) — For release CI.
+9. **Security contact email** (public only) — For SECURITY.md.
+
+Never guess these. Ask first, then generate everything in one pass.
+
+---
+
+## File Matrix
+
+| File / Folder | Public | Private |
+|---|---|---|
+| `README.md` | Yes | Yes |
+| `CHANGELOG.md` | Yes | Yes |
+| `CONTRIBUTING.md` | Yes | No |
+| `LICENSE` | Yes | No |
+| `SECURITY.md` | Yes | No |
+| `.gitignore` | Yes | Yes |
+| `.editorconfig` | Yes | Yes |
+| `release-notes/v*.md` | Yes | Yes |
+| `.github/workflows/` | Yes | Yes |
+| `.github/PULL_REQUEST_TEMPLATE.md` | Yes | No |
+| `.github/ISSUE_TEMPLATE/` | Yes | No |
+| `.github/dependabot.yml` | Yes | No |
+
+---
+
+## .gitignore
+
+Include at minimum (adapt per language):
+
+```
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Release notes are tracked, but build artifacts are not
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Language-specific (add as needed)
+# Go: /vendor/, go.work
+# Rust: /target/
+# Node: node_modules/, dist/
+# Python: __pycache__/, *.pyc, .venv/
+
+# Environment and secrets
+.env
+.env.*
+*.pem
+*.key
+credentials.*
+```
+
+Always add `release-notes/` is **tracked** (do NOT ignore it).
+
+---
+
+## README.md Structure
+
+Use this exact structure. Adapt sections to what the project actually has — remove sections that don't apply, but keep the order.
+
+```markdown
+# Project Name
+
+<div align="center">
+
+[![Badge1](URL)](LINK)
+[![Badge2](URL)](LINK)
+
+**One-line description.**
+
+[Features](#-features) • [Installation](#-installation) • [Quick Start](#-quick-start) • [Commands/API](#) • [Configuration](#-configuration) • [Contributing](#-contributing) • [License](#-license)
+
+</div>
+
+---
+
+One paragraph explaining what this is and who it's for.
+
+## ✨ Features
+
+- **Feature 1** — Description.
+- **Feature 2** — Description.
+
+## 📦 Installation
+
+\`\`\`bash
+# install command
+\`\`\`
+
+## 🚀 Quick Start
+
+Code example showing the most common usage in <20 lines.
+
+## 📋 Commands / API Overview
+
+Table of commands or API methods. Use tables, not long prose.
+
+## ⚙️ Configuration
+
+Table of flags, env vars, or config fields.
+
+## 🏗️ Project Layout (optional)
+
+\`\`\`
+tree of important files/dirs
+\`\`\`
+
+## 🤝 Contributing (public only)
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## 📄 License (public only)
+
+Licensed under [LICENSE_TYPE](LICENSE).
+
+## 🔗 Links
+
+- **Repository**: URL
+- **Issues**: URL
+- **Changelog**: [CHANGELOG.md](CHANGELOG.md)
+
+---
+
+<div align="center">
+Made with ❤️ by Author (@handle)
+</div>
+```
+
+**Rules:**
+- Badges at top in a centered div.
+- Navigation links after the description line.
+- Emoji prefixes on section headers (✨📦🚀📋⚙️🏗️🤝📄🔗).
+- Tables for commands, config, API — not paragraph descriptions.
+- For private repos: omit Contributing and License sections.
+
+---
+
+## CHANGELOG.md Structure
+
+Follow [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/).
+
+```markdown
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [X.Y.Z] - YYYY-MM-DD
+
+### Added
+- Items added in this release.
+
+### Changed
+- Items changed in this release.
+
+### Fixed
+- Bugs fixed in this release.
+
+### Removed
+- Items removed in this release.
+
+### Security
+- Security-related changes.
+
+### Migration from X.Y.Z (if applicable)
+- Steps to migrate.
+
+[Unreleased]: https://github.com/ORG/REPO/compare/vX.Y.Z...HEAD
+[X.Y.Z]: https://github.com/ORG/REPO/releases/tag/vX.Y.Z
+```
+
+**Rules:**
+- Newest version at top, oldest at bottom.
+- Only include subsections (Added, Changed, Fixed, etc.) that have content.
+- Link tags at the bottom for GitHub compare URLs.
+
+---
+
+## Release Notes (release-notes/vX.Y.Z.md)
+
+Each release gets its own file in `release-notes/`. Filename format: `v1.0.0.md`.
+
+```markdown
+# Project Name vX.Y.Z — Short title
+
+**Release date:** YYYY-MM-DD
+
+### Install
+
+\`\`\`bash
+install command for this exact version
+\`\`\`
+
+---
+
+## Summary
+
+1-3 sentence summary of what this release is about.
+
+---
+
+## What's included (or "What changed" for patches)
+
+### Section name
+- Bullet points describing features, changes, fixes.
+
+### Another section
+- More bullets.
+
+---
+
+## Links
+
+- [Registry/Docs](URL) · [Repository](URL) · [Changelog](URL)
+```
+
+**Rules:**
+- Title includes project name, version, and a short descriptor (e.g. "Initial release", "Performance improvements", "Bug fix").
+- Install section shows how to get this exact version.
+- Summary is brief. Details go in the sections below.
+- For documentation-only or trivial releases, the body can be just the Summary with no "What's included" sections.
+
+---
+
+## CONTRIBUTING.md Structure (Public Only)
+
+```markdown
+# Contributing to Project Name
+
+Thank you for your interest in contributing!
+
+---
+
+## Table of Contents
+
+- [Getting started](#getting-started)
+- [Running tests](#running-tests)
+- [Running benchmarks](#running-benchmarks)
+- [Code style](#code-style)
+- [Submitting changes](#submitting-changes)
+- [Reporting issues](#reporting-issues)
+
+---
+
+## Getting started
+
+**Requirements:**
+- Language version
+- Build tool
+
+\`\`\`bash
+git clone URL
+cd project
+build command
+\`\`\`
+
+## Running tests
+
+\`\`\`bash
+test commands
+\`\`\`
+
+## Running benchmarks (if applicable)
+
+\`\`\`bash
+bench commands
+\`\`\`
+
+## Code style
+
+- Linter/formatter commands that must pass.
+- Documentation expectations for new public APIs.
+- Prefer editing existing files over creating new ones.
+
+## Submitting changes
+
+1. **Open an issue first** for significant changes.
+2. Fork and branch from `main`.
+3. Add/update tests.
+4. Ensure CI checks pass.
+5. Open a PR with a clear description.
+
+One logical change per PR.
+
+## Reporting issues
+
+Open an issue at ISSUE_URL. Include:
+- Language/runtime version
+- OS and architecture
+- Minimal reproducer
+- Full error message
+```
+
+---
+
+## LICENSE (Public Only)
+
+Use the full text of the chosen license (MIT, Apache-2.0, etc.). Do not abbreviate. Place at repo root as `LICENSE` (no extension).
+
+---
+
+## GitHub Actions (.github/workflows/)
+
+Create CI workflows based on the project's needs. Below are the standard workflows to consider. **Only include what applies** — ask the user if unsure.
+
+### 1. CI — Build & Test (always include)
+
+Filename: `.github/workflows/ci.yml`
+
+Triggers: push to `main`, all pull requests.
+
+Steps:
+- Checkout code
+- Set up language toolchain (specific version)
+- Install dependencies
+- Lint / format check (e.g. `go vet`, `cargo clippy`, `eslint`)
+- Run tests (with race detector / coverage if applicable)
+- Build
+
+### 2. Release — Build Artifacts on Tag (if project produces binaries or packages)
+
+Filename: `.github/workflows/release.yml`
+
+Triggers: push tag `v*`.
+
+Steps:
+- Checkout code
+- Set up toolchain
+- Build release binaries (cross-compile if multi-platform)
+- Create GitHub Release with the binaries attached
+- Optionally publish to package registry (crates.io, npm, PyPI, pkg.go.dev)
+
+### 3. Docs — GitHub Pages (if project has a docs site)
+
+Filename: `.github/workflows/docs.yml`
+
+Triggers: push to `main` (or manual).
+
+Steps:
+- Checkout code
+- Build docs (mdbook, mkdocs, next.js, etc.)
+- Deploy to GitHub Pages
+
+### 4. Security — Dependency Audit (optional, good for public)
+
+Filename: `.github/workflows/audit.yml`
+
+Triggers: weekly schedule + push to `main`.
+
+Steps:
+- `cargo audit` / `npm audit` / `govulncheck` / etc.
+
+**Rules for all workflows:**
+- Pin action versions (e.g. `actions/checkout@v4`, not `@latest`).
+- Use matrix builds for multi-OS/multi-version if the project supports them.
+- Cache dependencies (Go module cache, Cargo registry, node_modules).
+- Set `timeout-minutes` on jobs to avoid hung CI.
+- For private repos, the same workflows apply but skip publishing steps.
+
+---
+
+## Commit Messages
+
+When the user says anything like "commit this", "push this", "commit these changes", or "I will commit this to github now", **immediately** generate a commit title and description based on all changes made in the current session. Do NOT ask — just provide it.
+
+### Format
+
+```
+<type>: <short summary in imperative mood, max 72 chars>
+
+<body — what changed and why, wrapped at 72 chars>
+```
+
+### Type prefixes
+
+| Prefix | When to use |
+|---|---|
+| `feat` | New feature or capability |
+| `fix` | Bug fix |
+| `perf` | Performance improvement |
+| `refactor` | Code restructuring with no behavior change |
+| `docs` | Documentation only |
+| `chore` | Build, CI, deps, tooling, repo scaffolding |
+| `test` | Adding or updating tests |
+| `style` | Formatting, whitespace, no logic change |
+
+### Rules
+
+1. **Title** — imperative mood ("add X", "fix Y", "remove Z"), not past tense ("added", "fixed").
+2. **Body** — explain the *why*, not just the *what*. Group related changes with bullet points if there are multiple.
+3. **Scope** — if changes touch one area, include it: `feat(engine): add 429 fast-path`.
+4. **Breaking changes** — prefix body with `BREAKING:` if applicable.
+5. **Multi-topic sessions** — if the session had many unrelated changes, suggest multiple commits with a split plan instead of one giant commit.
+6. **Present the commit message in a ready-to-copy code block** so the user can paste it directly.
+
+### Example output when user says "commit this"
+
+```
+feat(engine): eliminate distributor bottleneck, add 429 fast-path
+
+- Workers now grab sessions directly via atomic index instead of
+  reading from a channel fed by a single distributor goroutine.
+  Removes Task/TaskPool, ShutdownCh, and DistributeWork entirely.
+- 429 responses skip body read and immediately count as spam,
+  avoiding unnecessary I/O on rate-limited responses.
+- Add GoodSessions atomic counter with CAS on session bad marking
+  so workers exit cleanly when all sessions are challenged.
+- Add mid cookie to session auth, per-session pigeon IDs.
+- Fix ReadInto infinite loop at max buffer cap.
+- Restore WriteBufferSize/ReadBufferSize on transport.
+- Tighten ResponseHeaderTimeout from 10s to 5s.
+```
+
+### When to suggest splitting
+
+If the session included changes across unrelated concerns (e.g. new features + CI setup + docs), suggest a split:
+
+```
+I'd recommend splitting this into 3 commits:
+
+1. feat(engine): eliminate distributor, add 429 fast-path
+2. feat(cli): add -start/-end KSA time flags
+3. chore: add repo scaffolding (README, CI, changelog)
+
+Want me to list which files go in each?
+```
+
+---
+
+## Branch Naming
+
+When creating branches, use this format:
+
+```
+<type>/<short-kebab-description>
+```
+
+| Prefix | Use |
+|---|---|
+| `feat/` | New feature (`feat/429-fast-path`) |
+| `fix/` | Bug fix (`fix/readinto-infinite-loop`) |
+| `perf/` | Performance (`perf/eliminate-distributor`) |
+| `refactor/` | Restructure (`refactor/split-engine`) |
+| `docs/` | Documentation (`docs/add-readme`) |
+| `chore/` | Tooling/CI (`chore/add-ci-workflow`) |
+| `release/` | Release prep (`release/v1.0.0`) |
+
+Branch from `main`. Delete branches after merge.
+
+---
+
+## Tagging & Release Workflow
+
+1. All work happens on feature branches merged to `main`.
+2. When ready to release, update `CHANGELOG.md` (move Unreleased items to new version).
+3. Create `release-notes/vX.Y.Z.md`.
+4. Tag: `git tag vX.Y.Z` on `main`.
+5. Push tag: `git push origin vX.Y.Z` — triggers release CI.
+6. Version bumping follows semver:
+   - **Patch** (0.1.0 → 0.1.1): bug fixes only.
+   - **Minor** (0.1.0 → 0.2.0): new features, backward compatible.
+   - **Major** (0.2.0 → 1.0.0): breaking changes.
+
+---
+
+## PR Template (.github/PULL_REQUEST_TEMPLATE.md) — Public Only
+
+Create this file for public repos:
+
+```markdown
+## Summary
+
+<!-- What does this PR do? 1-3 sentences. -->
+
+## Changes
+
+<!-- Bullet list of what changed. -->
+
+-
+
+## Test plan
+
+<!-- How was this tested? -->
+
+- [ ] Existing tests pass
+- [ ] New tests added (if applicable)
+
+## Related issues
+
+<!-- Link any related issues: Fixes #123, Relates to #456 -->
+```
+
+---
+
+## Issue Templates (.github/ISSUE_TEMPLATE/) — Public Only
+
+### Bug report: `.github/ISSUE_TEMPLATE/bug_report.md`
+
+```markdown
+---
+name: Bug report
+about: Report a bug
+labels: bug
+---
+
+**Describe the bug**
+A clear description of what the bug is.
+
+**To reproduce**
+Steps to reproduce:
+1.
+2.
+
+**Expected behavior**
+What you expected to happen.
+
+**Environment**
+- OS:
+- Version:
+- Language/runtime version:
+
+**Additional context**
+Logs, screenshots, or anything else.
+```
+
+### Feature request: `.github/ISSUE_TEMPLATE/feature_request.md`
+
+```markdown
+---
+name: Feature request
+about: Suggest a feature
+labels: enhancement
+---
+
+**Problem**
+What problem does this solve?
+
+**Proposed solution**
+How should it work?
+
+**Alternatives considered**
+Other approaches you thought about.
+```
+
+---
+
+## Badges by Language
+
+When writing the README, include relevant badges from this list:
+
+| Language | Badges to include |
+|---|---|
+| **Go** | Go Reference (pkg.go.dev), Go Report Card, CI, License |
+| **Rust** | Crates.io version, docs.rs, CI, License |
+| **Node/TS** | npm version, CI, License |
+| **Python** | PyPI version, CI, License |
+| **Any** | CI status badge (always), License badge (public only) |
+
+Badge format: `[![Label](shield_url)](link_url)`
+
+---
+
+## Dependabot (.github/dependabot.yml) — Public Only
+
+```yaml
+version: 2
+updates:
+  - package-ecosystem: "gomod"  # or npm, pip, cargo, etc.
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+```
+
+Adapt `package-ecosystem` to the project language. For multi-language repos, add multiple entries.
+
+---
+
+## SECURITY.md — Public Only
+
+```markdown
+# Security Policy
+
+## Reporting a Vulnerability
+
+If you discover a security vulnerability, please report it responsibly.
+
+**Do NOT open a public issue.**
+
+Email: [SECURITY_EMAIL] with:
+- Description of the vulnerability
+- Steps to reproduce
+- Impact assessment
+
+You will receive a response within 48 hours. We will work with you to understand and address the issue before any public disclosure.
+
+## Supported Versions
+
+| Version | Supported |
+|---------|-----------|
+| latest  | Yes       |
+```
+
+---
+
+## .editorconfig
+
+Include at repo root for consistent formatting across editors:
+
+```ini
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+charset = utf-8
+
+[*.{go,rs,py,js,ts}]
+indent_style = tab
+
+[*.{yml,yaml,json,md,toml}]
+indent_style = space
+indent_size = 2
+```
+
+Adapt `indent_style` per language convention (Go uses tabs, most others use spaces).
+
+---
+
+## General Code Quality Rules
+
+Regardless of public/private:
+
+- Code must be clean, well-structured, and optimally performant.
+- No dead code, no commented-out blocks, no debug prints in committed code.
+- Functions should do one thing. Files should have a clear responsibility.
+- Use the language's standard formatting tool (gofmt, rustfmt, prettier, black).
+- Error handling must be explicit — no swallowed errors.

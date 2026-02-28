@@ -1,0 +1,36 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Binaries
+snare
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go
+/vendor/
+go.work
+
+# Build output
+/dist/
+/build/
+
+# Environment and secrets
+.env
+.env.*
+*.pem
+*.key
+credentials.*
+
+# Local captures and CA
+# .snare/
