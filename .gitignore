@@ -1,0 +1,29 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE / editor (do not commit)
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+*~
+
+# Build / binaries
+*.exe
+*.dll
+*.so
+*.dylib
+/snare
+
+# Go
+vendor/
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+credentials.*
