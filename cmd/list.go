@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/muxover/snare/capture"
 	"github.com/muxover/snare/config"
@@ -17,40 +18,67 @@ var (
 	listStatus int
 	listURL    string
 	listHost   string
+	listSince  string
+	listUntil  string
+	listBody   string
 )
 
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List recent captures",
-	Long:  "List captures from the store directory (same as used by serve). Reads from disk so it works even when the proxy is not running. Optional filters: --method, --status, --url, --host.",
+	Long:  "List captures from the store directory (same as used by serve). Reads from disk so it works even when the proxy is not running. Filters: --method, --status, --url, --host, --since, --until, --body.",
 	RunE:  runList,
 }
 
 func init() {
-	listCmd.Flags().IntVarP(&listLast, "last", "n", 20, "Number of captures to show")
+	listCmd.Flags().IntVarP(&listLast, "last", "n", 20, "")
 	listCmd.Flags().StringVar(&listMethod, "method", "", "Filter by HTTP method (e.g. GET, POST)")
 	listCmd.Flags().IntVar(&listStatus, "status", 0, "Filter by response status code (e.g. 200, 404)")
 	listCmd.Flags().StringVar(&listURL, "url", "", "Filter by URL substring")
 	listCmd.Flags().StringVar(&listHost, "host", "", "Filter by host (URL host part)")
+	listCmd.Flags().StringVar(&listSince, "since", "", "Include captures at or after this time (RFC3339 or 2006-01-02)")
+	listCmd.Flags().StringVar(&listUntil, "until", "", "Include captures at or before this time (RFC3339 or 2006-01-02)")
+	listCmd.Flags().StringVar(&listBody, "body", "", "Filter by substring in request or response body")
 }
 
 func runList(cmd *cobra.Command, args []string) error {
+	since, err := parseSinceFlag(listSince)
+	if err != nil {
+		return err
+	}
+	until, err := parseUntilFlag(listUntil)
+	if err != nil {
+		return err
+	}
+	if !since.IsZero() && !until.IsZero() && until.Before(since) {
+		return fmt.Errorf("--until must be on or after --since")
+	}
+
 	store := capture.NewStore(0, config.StoreDir())
-	loadN := listLast
-	if loadN <= 0 {
-		loadN = 100
-	}
-	hasFilter := listMethod != "" || listStatus != 0 || listURL != "" || listHost != ""
-	if hasFilter {
-		loadN = 500
-	}
-	captures := store.ListFromDisk(loadN)
-	if hasFilter {
-		captures = filterCaptures(captures, listMethod, listStatus, listURL, listHost)
-		if listLast > 0 && len(captures) > listLast {
-			captures = captures[:listLast]
+
+	hasFilter := listMethod != "" || listStatus != 0 || listURL != "" || listHost != "" ||
+		listSince != "" || listUntil != "" || listBody != ""
+	scanAll := listSince != "" || listUntil != "" || listBody != ""
+
+	var captures []*capture.Capture
+	if scanAll {
+		captures = store.AllFromDisk()
+	} else {
+		loadN := listLast
+		if loadN <= 0 {
+			loadN = 100
 		}
+		if hasFilter {
+			loadN = 500
+		}
+		captures = store.ListFromDisk(loadN)
 	}
+
+	captures = filterCaptures(captures, listMethod, listStatus, listURL, listHost, listBody, since, until)
+	if listLast > 0 && len(captures) > listLast {
+		captures = captures[:listLast]
+	}
+
 	if len(captures) == 0 {
 		storeDir := config.StoreDir()
 		fmt.Println("No captures found.")
@@ -61,23 +89,12 @@ func runList(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 	for _, c := range captures {
-		status := "-"
-		if c.Response != nil {
-			status = fmt.Sprintf("%d", c.Response.StatusCode)
-		}
-		if c.Error != "" {
-			status = "err"
-		}
-		idShort := c.ID
-		if len(idShort) > 8 {
-			idShort = idShort[:8]
-		}
-		fmt.Printf("%s  %s  %s  %s  %s\n", idShort, c.Timestamp.Format("15:04:05"), c.Request.Method, status, c.Request.URL)
+		printCaptureLine(c)
 	}
 	return nil
 }
 
-func filterCaptures(captures []*capture.Capture, method string, status int, urlSub, host string) []*capture.Capture {
+func filterCaptures(captures []*capture.Capture, method string, status int, urlSub, host, bodySub string, since, until time.Time) []*capture.Capture {
 	var out []*capture.Capture
 	for _, c := range captures {
 		if method != "" && c.Request.Method != method {
@@ -94,6 +111,19 @@ func filterCaptures(captures []*capture.Capture, method string, status int, urlS
 		if host != "" {
 			u, err := url.Parse(c.Request.URL)
 			if err != nil || !strings.Contains(u.Host, host) {
+				continue
+			}
+		}
+		if !since.IsZero() && c.Timestamp.Before(since) {
+			continue
+		}
+		if !until.IsZero() && c.Timestamp.After(until) {
+			continue
+		}
+		if bodySub != "" {
+			inReq := strings.Contains(string(c.Request.Body), bodySub)
+			inResp := c.Response != nil && strings.Contains(string(c.Response.Body), bodySub)
+			if !inReq && !inResp {
 				continue
 			}
 		}

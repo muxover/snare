@@ -23,7 +23,7 @@ var exportCmd = &cobra.Command{
 
 func init() {
 	exportCmd.Flags().StringVarP(&exportFormat, "format", "f", "json", "Format: json or har")
-	exportCmd.Flags().IntVarP(&exportLast, "last", "n", 50, "Number of captures to export")
+	exportCmd.Flags().IntVarP(&exportLast, "last", "n", 50, "")
 }
 
 func runExport(cmd *cobra.Command, args []string) error {
@@ -74,7 +74,7 @@ func buildHAR(captures []*capture.Capture) map[string]interface{} {
 	return map[string]interface{}{
 		"log": map[string]interface{}{
 			"version": "1.2",
-			"creator": map[string]interface{}{"name": "snare", "version": "1.0"},
+			"creator": map[string]interface{}{"name": "snare", "version": "1.2.0"},
 			"entries": entries,
 		},
 	}

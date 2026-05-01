@@ -17,7 +17,7 @@ Snare is a local HTTP/HTTPS proxy you run on your machine. Point `HTTP_PROXY` an
 
 - HTTP and HTTPS (CONNECT) with optional MITM (HTTP/1.1 and HTTP/2)
 - Every request/response saved to disk (JSON per capture)
-- List, show, replay, save, export, clear, delete from the CLI
+- List, watch, diff, show, replay, save, export, clear, delete from the CLI
 - Body decompression (gzip, deflate, brotli) for readable captures
 - CA generate and install for trusting the proxy on your system
 
@@ -61,8 +61,10 @@ snare replay <id>
 | Command | Description |
 |---------|-------------|
 | `snare serve` | Start the proxy (default port 8888) |
-| `snare list` | List recent captures (filters: `--method`, `--status`, `--url`, `--host`) |
+| `snare list` | List recent captures (filters: `--method`, `--status`, `--url`, `--host`, `--since`, `--until`, `--body`; shows duration) |
+| `snare watch` | Print new captures as they arrive (`--interval`) |
 | `snare show [id]` | Show full request/response for a capture |
+| `snare diff [id-a] [id-b]` | Compare two captures |
 | `snare replay [id]` | Re-send the request (optional `-u` URL, `-H` headers, `-n` repeat) |
 | `snare save [id]` | Save one or more captures to a JSON file (`-o`, `--all`) |
 | `snare export` | Export last N captures to JSON or HAR (`-f json|har`, `-n`) |

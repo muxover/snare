@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-05-02
+
+### Added
+
+- `snare watch` — print new captures as they are written (optional `--interval`).
+- `snare list` — duration column; filters `--since`, `--until`, `--body` (request/response substring).
+- `snare diff` — compare two captures (request line, status, headers, bodies).
+- `(*capture.Store).AllFromDisk` — load all capture files (used when list filters need a full scan).
+
 ## [1.1.0] - 2026-03-11
 
 First release.
@@ -21,5 +30,6 @@ First release.
 - Body decompression (gzip, deflate, brotli) for readable captures.
 - Config via `SNARE_STORE`, `SNARE_CA` and serve flags (port, bind, max-captures).
 
-[Unreleased]: https://github.com/muxover/snare/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/muxover/snare/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/muxover/snare/releases/tag/v1.2.0
 [1.1.0]: https://github.com/muxover/snare/releases/tag/v1.1.0

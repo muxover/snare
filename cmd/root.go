@@ -4,7 +4,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const Version = "1.1.0"
+const Version = "1.2.0"
 
 var rootCmd = &cobra.Command{
 	Use:   "snare",
@@ -19,12 +19,12 @@ func Execute() error {
 func init() {
 	rootCmd.Version = Version
 	rootCmd.SetVersionTemplate("snare version {{.Version}}\n")
-}
 
-func init() {
 	rootCmd.AddCommand(serveCmd)
 	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(watchCmd)
 	rootCmd.AddCommand(showCmd)
+	rootCmd.AddCommand(diffCmd)
 	rootCmd.AddCommand(replayCmd)
 	rootCmd.AddCommand(saveCmd)
 	rootCmd.AddCommand(exportCmd)

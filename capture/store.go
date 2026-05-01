@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 )
 
@@ -81,13 +82,9 @@ func (s *Store) pruneDiskToMax() {
 	if len(files) <= s.max {
 		return
 	}
-	for i := 0; i < len(files); i++ {
-		for j := i + 1; j < len(files); j++ {
-			if files[j].ModTime().Before(files[i].ModTime()) {
-				files[i], files[j] = files[j], files[i]
-			}
-		}
-	}
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].ModTime().Before(files[j].ModTime())
+	})
 	for i := 0; i < len(files)-s.max; i++ {
 		_ = os.Remove(filepath.Join(s.dir, files[i].Name()))
 	}
@@ -147,7 +144,7 @@ func (s *Store) GetByPrefix(prefix string) *Capture {
 	if c := s.Get(prefix); c != nil {
 		return c
 	}
-	for _, c := range s.ListFromDisk(500) {
+	for _, c := range s.AllFromDisk() {
 		if len(c.ID) >= len(prefix) && c.ID[:len(prefix)] == prefix {
 			return c
 		}
@@ -199,13 +196,9 @@ func (s *Store) ListFromDisk(n int) []*Capture {
 		}
 		files = append(files, info)
 	}
-	for i := 0; i < len(files); i++ {
-		for j := i + 1; j < len(files); j++ {
-			if files[j].ModTime().After(files[i].ModTime()) {
-				files[i], files[j] = files[j], files[i]
-			}
-		}
-	}
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].ModTime().After(files[j].ModTime())
+	})
 	if n > 0 && len(files) > n {
 		files = files[:n]
 	}
@@ -220,5 +213,33 @@ func (s *Store) ListFromDisk(n int) []*Capture {
 			out = append(out, c)
 		}
 	}
+	return out
+}
+
+func (s *Store) AllFromDisk() []*Capture {
+	if s.dir == "" {
+		return nil
+	}
+	entries, err := os.ReadDir(s.dir)
+	if err != nil {
+		return nil
+	}
+	var out []*Capture
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
+			continue
+		}
+		id := e.Name()
+		if len(id) > 5 {
+			id = id[:len(id)-5]
+		}
+		c := s.loadFromDisk(id)
+		if c != nil {
+			out = append(out, c)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].Timestamp.After(out[j].Timestamp)
+	})
 	return out
 }

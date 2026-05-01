@@ -23,8 +23,8 @@ var saveCmd = &cobra.Command{
 }
 
 func init() {
-	saveCmd.Flags().StringVarP(&saveOutput, "output", "o", "", "Output file")
-	saveCmd.Flags().BoolVar(&saveAll, "all", false, "Save all captures")
+	saveCmd.Flags().StringVarP(&saveOutput, "output", "o", "", "")
+	saveCmd.Flags().BoolVar(&saveAll, "all", false, "")
 	saveCmd.Flags().IntVarP(&saveLastN, "last", "n", 10, "With --all, save last N captures")
 }
 

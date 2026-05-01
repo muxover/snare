@@ -28,7 +28,7 @@ var replayCmd = &cobra.Command{
 }
 
 func init() {
-	replayCmd.Flags().IntVarP(&replayRepeat, "repeat", "n", 1, "Number of times to repeat")
+	replayCmd.Flags().IntVarP(&replayRepeat, "repeat", "n", 1, "")
 	replayCmd.Flags().StringVarP(&replayURL, "url", "u", "", "Override URL (optional)")
 	replayCmd.Flags().StringSliceVarP(&replayHeader, "header", "H", nil, "Add or override header (Key: Value); can be repeated")
 }
