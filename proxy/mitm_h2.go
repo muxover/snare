@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"github.com/muxover/snare/capture"
+	"github.com/muxover/snare/intercept"
 	"io"
 	"log/slog"
 	"net"
@@ -39,6 +40,15 @@ func (m *mitmH2Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	bodyBuf, _ := io.ReadAll(req.Body)
 	req.Body = io.NopCloser(bytes.NewReader(bodyBuf))
+
+	if m.parent.Intercept != nil && intercept.MatchesPattern(req, m.parent.InterceptMatch) {
+		newBody, dropped := m.parent.holdAndApply(req, capID, start, req.URL.String(), bodyBuf)
+		if dropped {
+			http.Error(rw, "request dropped by intercept", http.StatusBadGateway)
+			return
+		}
+		bodyBuf = newBody
+	}
 
 	outReq, _ := http.NewRequest(req.Method, req.URL.String(), bytes.NewReader(bodyBuf))
 	outReq.Header = req.Header.Clone()

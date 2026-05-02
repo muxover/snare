@@ -6,9 +6,10 @@ import (
 )
 
 const (
-	DefaultStoreDir = ".snare/captures"
-	DefaultCADir    = ".snare"
-	DefaultMockFile = ".snare/mocks.json"
+	DefaultStoreDir    = ".snare/captures"
+	DefaultCADir       = ".snare"
+	DefaultMockFile    = ".snare/mocks.json"
+	DefaultInterceptDir = ".snare/intercept"
 )
 
 func StoreDir() string {
@@ -31,6 +32,17 @@ func MockFile() string {
 		return filepath.Join(home, DefaultMockFile)
 	}
 	return DefaultMockFile
+}
+
+func InterceptDir() string {
+	if d := os.Getenv("SNARE_INTERCEPT"); d != "" {
+		return d
+	}
+	home, _ := os.UserHomeDir()
+	if home != "" {
+		return filepath.Join(home, DefaultInterceptDir)
+	}
+	return DefaultInterceptDir
 }
 
 func CADir() string {

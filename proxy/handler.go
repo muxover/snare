@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"github.com/muxover/snare/capture"
+	"github.com/muxover/snare/intercept"
 	"github.com/muxover/snare/mock"
 	"github.com/muxover/snare/proxy/cert"
 	"io"
@@ -20,15 +21,18 @@ import (
 )
 
 type Handler struct {
-	Transport     *http.Transport
-	Store         *capture.Store
-	Mocks         *mock.Store
-	HostCerts     *cert.HostCertCache
-	Log           *slog.Logger
-	MitmEnable    bool
-	HostRewrites  []HostRewrite
-	AddHeaders    []HeaderValue
-	RemoveHeaders []string
+	Transport        *http.Transport
+	Store            *capture.Store
+	Mocks            *mock.Store
+	Intercept        *intercept.Queue
+	InterceptMatch   string
+	InterceptTimeout time.Duration
+	HostCerts        *cert.HostCertCache
+	Log              *slog.Logger
+	MitmEnable       bool
+	HostRewrites     []HostRewrite
+	AddHeaders       []HeaderValue
+	RemoveHeaders    []string
 }
 
 type HostRewrite struct {
@@ -82,6 +86,16 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 	if u.Host == "" {
 		u.Host = req.Host
 	}
+
+	if h.Intercept != nil && intercept.MatchesPattern(req, h.InterceptMatch) {
+		newBody, dropped := h.holdAndApply(req, capID, start, u.String(), bodyBuf)
+		if dropped {
+			http.Error(rw, "request dropped by intercept", http.StatusBadGateway)
+			return
+		}
+		bodyBuf = newBody
+	}
+
 	outReq, err := http.NewRequest(req.Method, u.String(), bytes.NewReader(bodyBuf))
 	if err != nil {
 		h.Log.Error("new request", "err", err)
@@ -279,6 +293,16 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 		bodyBuf, _ := io.ReadAll(req.Body)
 		req.Body = io.NopCloser(bytes.NewReader(bodyBuf))
 
+		if h.Intercept != nil && intercept.MatchesPattern(req, h.InterceptMatch) {
+			newBody, dropped := h.holdAndApply(req, capID, start, req.URL.String(), bodyBuf)
+			if dropped {
+				_ = writeDropH1(clientConn)
+				continue
+			}
+			bodyBuf = newBody
+			req.Body = io.NopCloser(bytes.NewReader(bodyBuf))
+		}
+
 		reqBytes, _ := httputil.DumpRequest(req, false)
 		if _, err := originConn.Write(reqBytes); err != nil {
 			h.Store.Add(&capture.Capture{ID: capID, Timestamp: start, Error: err.Error()})
@@ -333,6 +357,52 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 		_ = resp.Write(respBytes)
 		_, _ = clientConn.Write(respBytes.Bytes())
 	}
+}
+
+func (h *Handler) holdAndApply(req *http.Request, id string, ts time.Time, url string, body []byte) ([]byte, bool) {
+	timeout := h.InterceptTimeout
+	if timeout <= 0 {
+		timeout = 5 * time.Minute
+	}
+	pr := &intercept.PendingRequest{
+		ID:        id,
+		Timestamp: ts,
+		Method:    req.Method,
+		URL:       url,
+		Headers:   req.Header.Clone(),
+		Body:      string(body),
+	}
+	if err := h.Intercept.Enqueue(pr); err != nil {
+		h.Log.Error("intercept enqueue", "err", err)
+		return body, false
+	}
+	h.Log.Info("intercepted — waiting for decision", "id", id[:8], "method", req.Method, "url", url)
+	decided, err := h.Intercept.WaitDecision(id, timeout)
+	_ = h.Intercept.Remove(id)
+	if err != nil {
+		h.Log.Warn("intercept timeout, dropping", "id", id[:8])
+		return nil, true
+	}
+	if decided.Decision == intercept.DecisionDrop {
+		h.Log.Info("intercept dropped", "id", id[:8])
+		return nil, true
+	}
+	if decided.ModMethod != "" {
+		req.Method = decided.ModMethod
+	}
+	if decided.ModHeaders != nil {
+		req.Header = decided.ModHeaders
+	}
+	if decided.ModBody != "" {
+		return []byte(decided.ModBody), false
+	}
+	return body, false
+}
+
+func writeDropH1(conn net.Conn) error {
+	resp := "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+	_, err := conn.Write([]byte(resp))
+	return err
 }
 
 func writeMockH1(conn net.Conn, req *http.Request, rule *mock.Rule, log *slog.Logger) bool {

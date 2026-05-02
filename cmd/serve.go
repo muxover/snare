@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/muxover/snare/capture"
 	"github.com/muxover/snare/config"
+	"github.com/muxover/snare/intercept"
 	"github.com/muxover/snare/mock"
 	"github.com/muxover/snare/proxy"
 	"github.com/muxover/snare/proxy/cert"
@@ -27,11 +28,13 @@ var (
 	serveStoreDir      string
 	serveVerbose       bool
 	serveMaxCaptures   int
-	serveUpstreamProxy string
-	serveRewriteHost   []string
-	serveAddHeader     []string
-	serveRemoveHeader  []string
-	serveMockFile      string
+	serveUpstreamProxy    string
+	serveRewriteHost      []string
+	serveAddHeader        []string
+	serveRemoveHeader     []string
+	serveMockFile         string
+	serveIntercept        string
+	serveInterceptTimeout time.Duration
 )
 
 var serveCmd = &cobra.Command{
@@ -53,6 +56,8 @@ func init() {
 	serveCmd.Flags().StringArrayVar(&serveAddHeader, "add-header", nil, "Add or override outbound header (Key: Value); repeatable")
 	serveCmd.Flags().StringArrayVar(&serveRemoveHeader, "remove-header", nil, "Remove outbound header by name; repeatable")
 	serveCmd.Flags().StringVar(&serveMockFile, "mock-file", "", "Load mock rules from this file (default: SNARE_MOCKS or ~/.snare/mocks.json)")
+	serveCmd.Flags().StringVar(&serveIntercept, "intercept", "", "Intercept requests whose URL matches this pattern (use * for all)")
+	serveCmd.Flags().DurationVar(&serveInterceptTimeout, "intercept-timeout", 5*time.Minute, "How long to wait for a decision before dropping the intercepted request")
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
@@ -101,6 +106,12 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel}))
 
+	var interceptQueue *intercept.Queue
+	if serveIntercept != "" {
+		interceptQueue = intercept.NewQueue(config.InterceptDir())
+		log.Info("intercept enabled", "match", serveIntercept, "dir", config.InterceptDir())
+	}
+
 	var hostCerts *cert.HostCertCache
 	mitmEnable := !serveNoMITM
 	if mitmEnable {
@@ -114,15 +125,18 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 
 	handler := &proxy.Handler{
-		Transport:     transport,
-		Store:         store,
-		Mocks:         mocks,
-		HostCerts:     hostCerts,
-		Log:           log,
-		MitmEnable:    mitmEnable,
-		HostRewrites:  rewrites,
-		AddHeaders:    addHeaders,
-		RemoveHeaders: removeHeaders,
+		Transport:        transport,
+		Store:            store,
+		Mocks:            mocks,
+		Intercept:        interceptQueue,
+		InterceptMatch:   serveIntercept,
+		InterceptTimeout: serveInterceptTimeout,
+		HostCerts:        hostCerts,
+		Log:              log,
+		MitmEnable:       mitmEnable,
+		HostRewrites:     rewrites,
+		AddHeaders:       addHeaders,
+		RemoveHeaders:    removeHeaders,
 	}
 
 	addr := serveBind + ":" + servePort

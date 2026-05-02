@@ -19,6 +19,7 @@ Snare is a local HTTP/HTTPS proxy you run on your machine. Point `HTTP_PROXY` an
 - Every request/response saved to disk (JSON per capture)
 - List, watch, diff, show, replay, import, save, export, clear, delete from the CLI
 - Mock rules that intercept matching requests and return fixed responses
+- Request interception — pause, inspect, edit, forward, or drop live requests
 - Body decompression (gzip, deflate, brotli) for readable captures
 - CA generate and install for trusting the proxy on your system
 - Upstream proxy chaining, host rewrite rules, and outbound header rewrite/remove
@@ -74,6 +75,10 @@ snare replay <id>
 | `snare mock list` | List all mock rules |
 | `snare mock remove [id]` | Remove a mock rule by ID or prefix |
 | `snare mock clear` | Remove all mock rules |
+| `snare intercept list` | List requests currently held by the proxy |
+| `snare intercept forward [id]` | Release a held request to the origin |
+| `snare intercept edit [id]` | Edit a held request in `$EDITOR` then forward it |
+| `snare intercept drop [id]` | Drop a held request (client receives 502) |
 | `snare save [id]` | Save one or more captures to a JSON file (`-o`, `--all`) |
 | `snare export` | Export last N captures to JSON or HAR (`-f json|har`, `-n`) |
 | `snare clear` | Delete all captures from the store |
@@ -97,6 +102,9 @@ snare replay <id>
 | `--remove-header` | Remove outbound header by name (repeatable) |
 | `--mock-file` | Load mock rules from this file (default: `SNARE_MOCKS` or `~/.snare/mocks.json`) |
 | `SNARE_MOCKS` | Path to mock rules file |
+| `--intercept` | Intercept requests matching this URL pattern (use `*` for all) |
+| `--intercept-timeout` | How long to wait for a decision before auto-dropping (default: 5m) |
+| `SNARE_INTERCEPT` | Directory for pending intercept files (default: `~/.snare/intercept`) |
 
 ## Contributing
 

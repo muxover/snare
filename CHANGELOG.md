@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-05-02
+
+### Added
+
+- `snare serve --intercept <pattern>` — pause requests matching a URL pattern before forwarding (use `*` for all).
+- `snare intercept list` — list requests currently held by the proxy.
+- `snare intercept forward [id]` — release a held request to the origin as-is.
+- `snare intercept edit [id]` — open a held request in `$EDITOR`, modify method/headers/body, then forward.
+- `snare intercept drop [id]` — return 502 to the client and discard the request.
+- `snare serve --intercept-timeout` — auto-drop intercepted requests after this duration (default: 5m).
+- `SNARE_INTERCEPT` env var for the intercept queue directory.
+- Interception works across plain HTTP, MITM HTTP/1.1, and MITM HTTP/2.
+
 ## [1.4.0] - 2026-05-02
 
 ### Added
@@ -61,7 +74,8 @@ First release.
 - Body decompression (gzip, deflate, brotli) for readable captures.
 - Config via `SNARE_STORE`, `SNARE_CA` and serve flags (port, bind, max-captures).
 
-[Unreleased]: https://github.com/muxover/snare/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/muxover/snare/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/muxover/snare/releases/tag/v1.5.0
 [1.4.0]: https://github.com/muxover/snare/releases/tag/v1.4.0
 [1.3.0]: https://github.com/muxover/snare/releases/tag/v1.3.0
 [1.2.0]: https://github.com/muxover/snare/releases/tag/v1.2.0
