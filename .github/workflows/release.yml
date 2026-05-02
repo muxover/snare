@@ -22,9 +22,10 @@ jobs:
 
       - name: Build
         run: |
-          GOOS=linux GOARCH=amd64 go build -v -o snare-linux-amd64 .
-          GOOS=darwin GOARCH=amd64 go build -v -o snare-darwin-amd64 .
-          GOOS=darwin GOARCH=arm64 go build -v -o snare-darwin-arm64 .
+          GOOS=linux   GOARCH=amd64 go build -v -o snare-linux-amd64 .
+          GOOS=linux   GOARCH=arm64 go build -v -o snare-linux-arm64 .
+          GOOS=darwin  GOARCH=amd64 go build -v -o snare-darwin-amd64 .
+          GOOS=darwin  GOARCH=arm64 go build -v -o snare-darwin-arm64 .
           GOOS=windows GOARCH=amd64 go build -v -o snare-windows-amd64.exe .
 
       - name: Create Release
@@ -34,6 +35,7 @@ jobs:
           body_path: release-notes/${{ github.ref_name }}.md
           files: |
             snare-linux-amd64
+            snare-linux-arm64
             snare-darwin-amd64
             snare-darwin-arm64
             snare-windows-amd64.exe

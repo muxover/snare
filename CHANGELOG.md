@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-05-02
+
+### Added
+
+- `snare tui` — interactive terminal UI (Bubble Tea). Live capture list that polls every 2 s; keyboard navigation (↑↓/jk); full request/response detail view; inline replay; `/` filter by URL or method.
+- `snare pipe` — stream captures as newline-delimited JSON (NDJSON). Supports `--follow` to tail new arrivals, and `--method`, `--status`, `--url` filters. Designed for `jq` and shell pipelines.
+- `snare assert` — assert conditions on captures and exit 1 if unmet. Flags: `--url`, `--method`, `--status`, `--body`, `--min` (default 1), `--max`. For CI smoke tests and contract checks.
+- `snare serve --on-capture <cmd>` — run a shell command for every new capture; the full capture JSON is written to its stdin.
+- Release artifacts now include `linux-arm64` in addition to the existing targets (`linux-amd64`, `darwin-amd64`, `darwin-arm64`, `windows-amd64`).
+
 ## [1.5.0] - 2026-05-02
 
 ### Added
@@ -74,7 +84,8 @@ First release.
 - Body decompression (gzip, deflate, brotli) for readable captures.
 - Config via `SNARE_STORE`, `SNARE_CA` and serve flags (port, bind, max-captures).
 
-[Unreleased]: https://github.com/muxover/snare/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/muxover/snare/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/muxover/snare/releases/tag/v1.6.0
 [1.5.0]: https://github.com/muxover/snare/releases/tag/v1.5.0
 [1.4.0]: https://github.com/muxover/snare/releases/tag/v1.4.0
 [1.3.0]: https://github.com/muxover/snare/releases/tag/v1.3.0

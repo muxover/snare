@@ -33,6 +33,7 @@ type Handler struct {
 	HostRewrites     []HostRewrite
 	AddHeaders       []HeaderValue
 	RemoveHeaders    []string
+	OnCapture        func(*capture.Capture)
 }
 
 type HostRewrite struct {
@@ -43,6 +44,13 @@ type HostRewrite struct {
 type HeaderValue struct {
 	Key   string
 	Value string
+}
+
+func (h *Handler) addCapture(c *capture.Capture) {
+	h.Store.Add(c)
+	if h.OnCapture != nil {
+		go h.OnCapture(c)
+	}
 }
 
 func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -115,7 +123,7 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 			reqHeaders.Del("Content-Encoding")
 			reqHeaders.Set("Content-Length", strconv.Itoa(len(reqCaptureBody)))
 		}
-		h.Store.Add(&capture.Capture{
+		h.addCapture(&capture.Capture{
 			ID:        capID,
 			Timestamp: start,
 			Protocol:  "h1",
@@ -165,7 +173,7 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 		},
 		Duration: duration,
 	}
-	h.Store.Add(c)
+	h.addCapture(c)
 	h.Log.Info("captured", "method", req.Method, "url", outReq.URL.String(), "status", resp.StatusCode, "id", capID[:8])
 
 	for k, v := range resp.Header {
@@ -305,7 +313,7 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 
 		reqBytes, _ := httputil.DumpRequest(req, false)
 		if _, err := originConn.Write(reqBytes); err != nil {
-			h.Store.Add(&capture.Capture{ID: capID, Timestamp: start, Error: err.Error()})
+			h.addCapture(&capture.Capture{ID: capID, Timestamp: start, Error: err.Error()})
 			return
 		}
 		if len(bodyBuf) > 0 {
@@ -314,7 +322,7 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 
 		resp, err := http.ReadResponse(originReader, req)
 		if err != nil {
-			h.Store.Add(&capture.Capture{ID: capID, Timestamp: start, Error: err.Error()})
+			h.addCapture(&capture.Capture{ID: capID, Timestamp: start, Error: err.Error()})
 			return
 		}
 		respBody, _ := io.ReadAll(resp.Body)
@@ -333,7 +341,7 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 			respHeaders.Del("Content-Encoding")
 			respHeaders.Set("Content-Length", strconv.Itoa(len(captureBody)))
 		}
-		h.Store.Add(&capture.Capture{
+		h.addCapture(&capture.Capture{
 			ID:        capID,
 			Timestamp: start,
 			Protocol:  "h1",

@@ -4,7 +4,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const Version = "1.5.0"
+const Version = "1.6.0"
 
 var rootCmd = &cobra.Command{
 	Use:   "snare",
@@ -29,6 +29,9 @@ func init() {
 	rootCmd.AddCommand(importCmd)
 	rootCmd.AddCommand(mockCmd)
 	rootCmd.AddCommand(interceptCmd)
+	rootCmd.AddCommand(tuiCmd)
+	rootCmd.AddCommand(pipeCmd)
+	rootCmd.AddCommand(assertCmd)
 	rootCmd.AddCommand(saveCmd)
 	rootCmd.AddCommand(exportCmd)
 	rootCmd.AddCommand(clearCmd)

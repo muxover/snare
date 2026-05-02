@@ -3,23 +3,20 @@ package proxy
 import (
 	"bytes"
 	"crypto/tls"
-	"github.com/muxover/snare/capture"
-	"github.com/muxover/snare/intercept"
 	"io"
-	"log/slog"
 	"net"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/muxover/snare/capture"
+	"github.com/muxover/snare/intercept"
 	"golang.org/x/net/http2"
 )
 
 type mitmH2Handler struct {
 	hostname  string
-	store     *capture.Store
-	log       *slog.Logger
 	parent    *Handler
 	transport *http.Transport
 }
@@ -57,7 +54,7 @@ func (m *mitmH2Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	resp, err := m.transport.RoundTrip(outReq)
 	if err != nil {
-		m.store.Add(&capture.Capture{ID: capID, Timestamp: start, Error: err.Error()})
+		m.parent.addCapture(&capture.Capture{ID: capID, Timestamp: start, Error: err.Error()})
 		http.Error(rw, err.Error(), http.StatusBadGateway)
 		return
 	}
@@ -77,7 +74,7 @@ func (m *mitmH2Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		respHeaders.Del("Content-Encoding")
 		respHeaders.Set("Content-Length", strconv.Itoa(len(captureBody)))
 	}
-	m.store.Add(&capture.Capture{
+	m.parent.addCapture(&capture.Capture{
 		ID:        capID,
 		Timestamp: start,
 		Protocol:  "h2",
@@ -108,8 +105,6 @@ func (h *Handler) mitmHTTP2(clientConn net.Conn, originConn *tls.Conn, hostname 
 	srv := &http2.Server{}
 	handler := &mitmH2Handler{
 		hostname:  hostname,
-		store:     h.Store,
-		log:       h.Log,
 		parent:    h,
 		transport: h.Transport,
 	}

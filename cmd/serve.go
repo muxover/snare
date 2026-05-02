@@ -1,33 +1,37 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"log/slog"
+	"net"
+	"net/http"
+	"os"
+	"os/exec"
+	"os/signal"
+	"runtime"
+	"strings"
+	"syscall"
+	"time"
+
 	"github.com/muxover/snare/capture"
 	"github.com/muxover/snare/config"
 	"github.com/muxover/snare/intercept"
 	"github.com/muxover/snare/mock"
 	"github.com/muxover/snare/proxy"
 	"github.com/muxover/snare/proxy/cert"
-	"log/slog"
-	"net"
-	"net/http"
-	"os"
-	"os/signal"
-	"strings"
-	"syscall"
-	"time"
-
 	"github.com/spf13/cobra"
 )
 
 var (
-	servePort          string
-	serveBind          string
-	serveNoMITM        bool
-	serveStoreDir      string
-	serveVerbose       bool
-	serveMaxCaptures   int
+	servePort             string
+	serveBind             string
+	serveNoMITM           bool
+	serveStoreDir         string
+	serveVerbose          bool
+	serveMaxCaptures      int
 	serveUpstreamProxy    string
 	serveRewriteHost      []string
 	serveAddHeader        []string
@@ -35,6 +39,7 @@ var (
 	serveMockFile         string
 	serveIntercept        string
 	serveInterceptTimeout time.Duration
+	serveOnCapture        string
 )
 
 var serveCmd = &cobra.Command{
@@ -58,6 +63,7 @@ func init() {
 	serveCmd.Flags().StringVar(&serveMockFile, "mock-file", "", "Load mock rules from this file (default: SNARE_MOCKS or ~/.snare/mocks.json)")
 	serveCmd.Flags().StringVar(&serveIntercept, "intercept", "", "Intercept requests whose URL matches this pattern (use * for all)")
 	serveCmd.Flags().DurationVar(&serveInterceptTimeout, "intercept-timeout", 5*time.Minute, "How long to wait for a decision before dropping the intercepted request")
+	serveCmd.Flags().StringVar(&serveOnCapture, "on-capture", "", "Run this shell command for each capture; the capture JSON is written to its stdin")
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
@@ -137,6 +143,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		HostRewrites:     rewrites,
 		AddHeaders:       addHeaders,
 		RemoveHeaders:    removeHeaders,
+		OnCapture:        buildOnCapture(serveOnCapture),
 	}
 
 	addr := serveBind + ":" + servePort
@@ -228,6 +235,30 @@ func parseHeaderPairs(items []string) ([]proxy.HeaderValue, error) {
 	}
 	return out, nil
 }
+
+func buildOnCapture(cmd string) func(*capture.Capture) {
+	if cmd == "" {
+		return nil
+	}
+	return func(c *capture.Capture) {
+		data, err := json.Marshal(c)
+		if err != nil {
+			return
+		}
+		data = append(data, '\n')
+		var proc *exec.Cmd
+		if runtime.GOOS == "windows" {
+			proc = exec.Command("cmd", "/C", cmd)
+		} else {
+			proc = exec.Command("sh", "-c", cmd)
+		}
+		proc.Stdin = bytes.NewReader(data)
+		proc.Stdout = os.Stderr
+		proc.Stderr = os.Stderr
+		_ = proc.Run()
+	}
+}
+
 
 func normalizeHeaderNames(items []string) []string {
 	out := make([]string, 0, len(items))

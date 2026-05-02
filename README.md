@@ -18,8 +18,12 @@ Snare is a local HTTP/HTTPS proxy you run on your machine. Point `HTTP_PROXY` an
 - HTTP and HTTPS (CONNECT) with optional MITM (HTTP/1.1 and HTTP/2)
 - Every request/response saved to disk (JSON per capture)
 - List, watch, diff, show, replay, import, save, export, clear, delete from the CLI
+- Interactive terminal UI (`snare tui`) — live capture list with keyboard navigation
 - Mock rules that intercept matching requests and return fixed responses
 - Request interception — pause, inspect, edit, forward, or drop live requests
+- Stream captures as NDJSON (`snare pipe`) for use with `jq` and shell scripts
+- CI assertions on captures (`snare assert`) with exit codes
+- Hook any shell command on every new capture (`--on-capture`)
 - Body decompression (gzip, deflate, brotli) for readable captures
 - CA generate and install for trusting the proxy on your system
 - Upstream proxy chaining, host rewrite rules, and outbound header rewrite/remove
@@ -79,6 +83,9 @@ snare replay <id>
 | `snare intercept forward [id]` | Release a held request to the origin |
 | `snare intercept edit [id]` | Edit a held request in `$EDITOR` then forward it |
 | `snare intercept drop [id]` | Drop a held request (client receives 502) |
+| `snare tui` | Interactive terminal UI — live capture list, inspect, replay with keyboard nav |
+| `snare pipe` | Stream all captures as NDJSON; use `--follow` to tail new arrivals |
+| `snare assert` | Assert capture conditions (`--url`, `--method`, `--status`, `--min`, `--max`); exits 1 on failure |
 | `snare save [id]` | Save one or more captures to a JSON file (`-o`, `--all`) |
 | `snare export` | Export last N captures to JSON or HAR (`-f json|har`, `-n`) |
 | `snare clear` | Delete all captures from the store |
@@ -105,6 +112,7 @@ snare replay <id>
 | `--intercept` | Intercept requests matching this URL pattern (use `*` for all) |
 | `--intercept-timeout` | How long to wait for a decision before auto-dropping (default: 5m) |
 | `SNARE_INTERCEPT` | Directory for pending intercept files (default: `~/.snare/intercept`) |
+| `--on-capture` | Shell command to run for each new capture; capture JSON is written to its stdin |
 
 ## Contributing
 
