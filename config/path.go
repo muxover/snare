@@ -8,6 +8,7 @@ import (
 const (
 	DefaultStoreDir = ".snare/captures"
 	DefaultCADir    = ".snare"
+	DefaultMockFile = ".snare/mocks.json"
 )
 
 func StoreDir() string {
@@ -19,6 +20,17 @@ func StoreDir() string {
 		return filepath.Join(home, DefaultStoreDir)
 	}
 	return DefaultStoreDir
+}
+
+func MockFile() string {
+	if f := os.Getenv("SNARE_MOCKS"); f != "" {
+		return f
+	}
+	home, _ := os.UserHomeDir()
+	if home != "" {
+		return filepath.Join(home, DefaultMockFile)
+	}
+	return DefaultMockFile
 }
 
 func CADir() string {

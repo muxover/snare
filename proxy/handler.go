@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"github.com/muxover/snare/capture"
+	"github.com/muxover/snare/mock"
 	"github.com/muxover/snare/proxy/cert"
 	"io"
 	"log/slog"
@@ -21,6 +22,7 @@ import (
 type Handler struct {
 	Transport     *http.Transport
 	Store         *capture.Store
+	Mocks         *mock.Store
 	HostCerts     *cert.HostCertCache
 	Log           *slog.Logger
 	MitmEnable    bool
@@ -57,6 +59,13 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
+	if h.Mocks != nil {
+		if rule := h.Mocks.Match(req); rule != nil {
+			h.serveMock(rw, req, rule)
+			return
+		}
+	}
+
 	start := time.Now()
 	capID := uuid.New().String()
 
@@ -257,6 +266,14 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 		req.URL.Host = hostname
 		h.applyOutboundMods(req)
 
+		if h.Mocks != nil {
+			if rule := h.Mocks.Match(req); rule != nil {
+				if writeMockH1(clientConn, req, rule, h.Log) {
+					continue
+				}
+			}
+		}
+
 		start := time.Now()
 		capID := uuid.New().String()
 		bodyBuf, _ := io.ReadAll(req.Body)
@@ -316,6 +333,58 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 		_ = resp.Write(respBytes)
 		_, _ = clientConn.Write(respBytes.Bytes())
 	}
+}
+
+func writeMockH1(conn net.Conn, req *http.Request, rule *mock.Rule, log *slog.Logger) bool {
+	status := rule.Status
+	if status == 0 {
+		status = http.StatusOK
+	}
+	body := []byte(rule.Body)
+	ct := rule.ContentType
+	if ct == "" {
+		ct = "application/json"
+	}
+	resp := &http.Response{
+		StatusCode:    status,
+		Proto:         "HTTP/1.1",
+		ProtoMajor:    1,
+		ProtoMinor:    1,
+		Header:        make(http.Header),
+		Body:          io.NopCloser(bytes.NewReader(body)),
+		ContentLength: int64(len(body)),
+		Request:       req,
+	}
+	resp.Header.Set("Content-Type", ct)
+	for k, v := range rule.Headers {
+		resp.Header.Set(k, v)
+	}
+	if err := resp.Write(conn); err != nil {
+		log.Error("write mock h1", "err", err)
+		return false
+	}
+	log.Info("mocked", "method", req.Method, "url", req.URL.String(), "status", status, "rule", rule.ID[:8])
+	return true
+}
+
+func (h *Handler) serveMock(rw http.ResponseWriter, req *http.Request, rule *mock.Rule) {
+	ct := rule.ContentType
+	if ct == "" {
+		ct = "application/json"
+	}
+	for k, v := range rule.Headers {
+		rw.Header().Set(k, v)
+	}
+	if rw.Header().Get("Content-Type") == "" {
+		rw.Header().Set("Content-Type", ct)
+	}
+	status := rule.Status
+	if status == 0 {
+		status = http.StatusOK
+	}
+	rw.WriteHeader(status)
+	_, _ = rw.Write([]byte(rule.Body))
+	h.Log.Info("mocked", "method", req.Method, "url", req.URL.String(), "status", status, "rule", rule.ID[:8])
 }
 
 func (h *Handler) applyOutboundMods(req *http.Request) {

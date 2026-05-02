@@ -26,6 +26,14 @@ type mitmH2Handler struct {
 func (m *mitmH2Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	req.URL.Scheme = "https"
 	req.URL.Host = m.hostname
+
+	if m.parent.Mocks != nil {
+		if rule := m.parent.Mocks.Match(req); rule != nil {
+			m.parent.serveMock(rw, req, rule)
+			return
+		}
+	}
+
 	start := time.Now()
 	capID := uuid.New().String()
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/muxover/snare/capture"
 	"github.com/muxover/snare/config"
+	"github.com/muxover/snare/mock"
 	"github.com/muxover/snare/proxy"
 	"github.com/muxover/snare/proxy/cert"
 	"log/slog"
@@ -30,6 +31,7 @@ var (
 	serveRewriteHost   []string
 	serveAddHeader     []string
 	serveRemoveHeader  []string
+	serveMockFile      string
 )
 
 var serveCmd = &cobra.Command{
@@ -50,6 +52,7 @@ func init() {
 	serveCmd.Flags().StringArrayVar(&serveRewriteHost, "rewrite-host", nil, "Rewrite outbound host using from=to (repeatable)")
 	serveCmd.Flags().StringArrayVar(&serveAddHeader, "add-header", nil, "Add or override outbound header (Key: Value); repeatable")
 	serveCmd.Flags().StringArrayVar(&serveRemoveHeader, "remove-header", nil, "Remove outbound header by name; repeatable")
+	serveCmd.Flags().StringVar(&serveMockFile, "mock-file", "", "Load mock rules from this file (default: SNARE_MOCKS or ~/.snare/mocks.json)")
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
@@ -82,6 +85,12 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 	removeHeaders := normalizeHeaderNames(serveRemoveHeader)
 
+	mockFilePath := serveMockFile
+	if mockFilePath == "" {
+		mockFilePath = config.MockFile()
+	}
+	mocks := mock.NewStore(mockFilePath)
+
 	transport, err := proxy.ProxyTransport(true, serveUpstreamProxy)
 	if err != nil {
 		return err
@@ -107,6 +116,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	handler := &proxy.Handler{
 		Transport:     transport,
 		Store:         store,
+		Mocks:         mocks,
 		HostCerts:     hostCerts,
 		Log:           log,
 		MitmEnable:    mitmEnable,

@@ -18,6 +18,7 @@ Snare is a local HTTP/HTTPS proxy you run on your machine. Point `HTTP_PROXY` an
 - HTTP and HTTPS (CONNECT) with optional MITM (HTTP/1.1 and HTTP/2)
 - Every request/response saved to disk (JSON per capture)
 - List, watch, diff, show, replay, import, save, export, clear, delete from the CLI
+- Mock rules that intercept matching requests and return fixed responses
 - Body decompression (gzip, deflate, brotli) for readable captures
 - CA generate and install for trusting the proxy on your system
 - Upstream proxy chaining, host rewrite rules, and outbound header rewrite/remove
@@ -68,6 +69,11 @@ snare replay <id>
 | `snare diff [id-a] [id-b]` | Compare two captures |
 | `snare replay [id]` | Re-send one capture by ID, or replay all URL matches with `--match` (optional `-u` URL, `-H` headers, `-n` repeat) |
 | `snare import [file.har]` | Import HAR entries into the capture store |
+| `snare mock add` | Add a mock rule (`--url`, `--method`, `--status`, `--body`, `--content-type`, `--header`) |
+| `snare mock from [id]` | Generate a mock rule from a captured response |
+| `snare mock list` | List all mock rules |
+| `snare mock remove [id]` | Remove a mock rule by ID or prefix |
+| `snare mock clear` | Remove all mock rules |
 | `snare save [id]` | Save one or more captures to a JSON file (`-o`, `--all`) |
 | `snare export` | Export last N captures to JSON or HAR (`-f json|har`, `-n`) |
 | `snare clear` | Delete all captures from the store |
@@ -89,6 +95,8 @@ snare replay <id>
 | `--rewrite-host` | Rewrite outbound host with `from=to` (repeatable) |
 | `--add-header` | Add or override outbound header (`Key: Value`, repeatable) |
 | `--remove-header` | Remove outbound header by name (repeatable) |
+| `--mock-file` | Load mock rules from this file (default: `SNARE_MOCKS` or `~/.snare/mocks.json`) |
+| `SNARE_MOCKS` | Path to mock rules file |
 
 ## Contributing
 

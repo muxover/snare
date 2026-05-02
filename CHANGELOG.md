@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-05-02
+
+### Added
+
+- `snare mock add` — add a mock rule (method, URL substring, status, body, content-type, headers, name).
+- `snare mock from [id]` — generate a mock rule from an existing capture's response.
+- `snare mock list` — list all active mock rules.
+- `snare mock remove [id]` — remove a rule by ID or prefix.
+- `snare mock clear` — remove all mock rules.
+- `snare serve --mock-file` — load mock rules at startup from a JSON file.
+- Mock rules are matched in order; first match wins; matched requests are not forwarded to the origin.
+- `SNARE_MOCKS` env var to set the default mock file path.
+
 ## [1.3.0] - 2026-05-02
 
 ### Added
@@ -48,7 +61,8 @@ First release.
 - Body decompression (gzip, deflate, brotli) for readable captures.
 - Config via `SNARE_STORE`, `SNARE_CA` and serve flags (port, bind, max-captures).
 
-[Unreleased]: https://github.com/muxover/snare/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/muxover/snare/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/muxover/snare/releases/tag/v1.4.0
 [1.3.0]: https://github.com/muxover/snare/releases/tag/v1.3.0
 [1.2.0]: https://github.com/muxover/snare/releases/tag/v1.2.0
 [1.1.0]: https://github.com/muxover/snare/releases/tag/v1.1.0
