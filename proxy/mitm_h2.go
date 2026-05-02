@@ -3,11 +3,11 @@ package proxy
 import (
 	"bytes"
 	"crypto/tls"
+	"github.com/muxover/snare/capture"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
-	"github.com/muxover/snare/capture"
 	"strconv"
 	"time"
 
@@ -16,10 +16,11 @@ import (
 )
 
 type mitmH2Handler struct {
-	hostname string
-	origin   net.Conn
-	store    *capture.Store
-	log      *slog.Logger
+	hostname  string
+	store     *capture.Store
+	log       *slog.Logger
+	parent    *Handler
+	transport *http.Transport
 }
 
 func (m *mitmH2Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -34,13 +35,9 @@ func (m *mitmH2Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	outReq, _ := http.NewRequest(req.Method, req.URL.String(), bytes.NewReader(bodyBuf))
 	outReq.Header = req.Header.Clone()
 	outReq.Host = m.hostname
+	m.parent.applyOutboundMods(outReq)
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	_ = http2.ConfigureTransport(tr)
-	client := &http.Client{Transport: tr}
-	resp, err := client.Do(outReq)
+	resp, err := m.transport.RoundTrip(outReq)
 	if err != nil {
 		m.store.Add(&capture.Capture{ID: capID, Timestamp: start, Error: err.Error()})
 		http.Error(rw, err.Error(), http.StatusBadGateway)
@@ -91,6 +88,12 @@ func (m *mitmH2Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 func (h *Handler) mitmHTTP2(clientConn net.Conn, originConn *tls.Conn, hostname string, _ *http.Request) {
 	srv := &http2.Server{}
-	handler := &mitmH2Handler{hostname: hostname, origin: originConn, store: h.Store, log: h.Log}
+	handler := &mitmH2Handler{
+		hostname:  hostname,
+		store:     h.Store,
+		log:       h.Log,
+		parent:    h,
+		transport: h.Transport,
+	}
 	srv.ServeConn(clientConn, &http2.ServeConnOpts{Handler: handler})
 }

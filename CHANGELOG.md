@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-05-02
+
+### Added
+
+- `snare serve`: `--upstream-proxy` to chain outbound traffic through another proxy.
+- `snare serve`: `--rewrite-host` for outbound host rewrites and `--add-header` / `--remove-header` for outbound header mutation.
+- `snare replay`: `--match` to replay all captures whose URL matches a substring.
+- `snare import [file.har]`: import HAR entries into the capture store.
+
+### Changed
+
+- Outbound rewrites/header mutation now apply across plain HTTP, MITM HTTP/1.1, and MITM HTTP/2 paths.
+
+### Dependencies
+
+- `golang.org/x/net` bumped from `v0.51.0` to `v0.53.0`.
+- `github.com/andybalholm/brotli` bumped from `v1.2.0` to `v1.2.1`.
+
 ## [1.2.0] - 2026-05-02
 
 ### Added
@@ -30,6 +48,7 @@ First release.
 - Body decompression (gzip, deflate, brotli) for readable captures.
 - Config via `SNARE_STORE`, `SNARE_CA` and serve flags (port, bind, max-captures).
 
-[Unreleased]: https://github.com/muxover/snare/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/muxover/snare/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/muxover/snare/releases/tag/v1.3.0
 [1.2.0]: https://github.com/muxover/snare/releases/tag/v1.2.0
 [1.1.0]: https://github.com/muxover/snare/releases/tag/v1.1.0

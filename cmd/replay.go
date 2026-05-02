@@ -17,13 +17,14 @@ var (
 	replayRepeat int
 	replayURL    string
 	replayHeader []string
+	replayMatch  string
 )
 
 var replayCmd = &cobra.Command{
 	Use:   "replay [id]",
 	Short: "Replay a captured request",
-	Long:  "Re-send the captured request to the same (or override) URL. Does not use the proxy; sends directly. Use -u to override the URL, -n to repeat, -H to add or override headers.",
-	Args:  cobra.ExactArgs(1),
+	Long:  "Re-send captured requests directly (not through the proxy). Provide a capture ID, or use --match to replay all captures whose URL contains the given substring.",
+	Args:  cobra.ArbitraryArgs,
 	RunE:  runReplay,
 }
 
@@ -31,15 +32,59 @@ func init() {
 	replayCmd.Flags().IntVarP(&replayRepeat, "repeat", "n", 1, "")
 	replayCmd.Flags().StringVarP(&replayURL, "url", "u", "", "Override URL (optional)")
 	replayCmd.Flags().StringSliceVarP(&replayHeader, "header", "H", nil, "Add or override header (Key: Value); can be repeated")
+	replayCmd.Flags().StringVar(&replayMatch, "match", "", "Replay all captures whose URL contains this substring")
 }
 
 func runReplay(cmd *cobra.Command, args []string) error {
-	id := args[0]
 	store := capture.NewStore(0, config.StoreDir())
-	c := store.GetByPrefix(id)
-	if c == nil {
-		return fmt.Errorf("capture not found: %s", id)
+	if replayRepeat < 1 {
+		return fmt.Errorf("--repeat must be at least 1")
 	}
+
+	var targets []*capture.Capture
+	if replayMatch != "" {
+		if len(args) > 0 {
+			return fmt.Errorf("use either capture id or --match, not both")
+		}
+		for _, c := range store.AllFromDisk() {
+			if strings.Contains(c.Request.URL, replayMatch) {
+				targets = append(targets, c)
+			}
+		}
+		if len(targets) == 0 {
+			return fmt.Errorf("no captures matched: %s", replayMatch)
+		}
+	} else {
+		if len(args) != 1 {
+			return fmt.Errorf("provide capture id or use --match")
+		}
+		id := args[0]
+		c := store.GetByPrefix(id)
+		if c == nil {
+			return fmt.Errorf("capture not found: %s", id)
+		}
+		targets = []*capture.Capture{c}
+	}
+
+	for idx, c := range targets {
+		if len(targets) > 1 {
+			short := c.ID
+			if len(short) > 8 {
+				short = short[:8]
+			}
+			fmt.Printf("Replaying [%s] %s %s\n", short, c.Request.Method, c.Request.URL)
+		}
+		if err := replayCapture(c); err != nil {
+			return err
+		}
+		if idx < len(targets)-1 {
+			fmt.Println()
+		}
+	}
+	return nil
+}
+
+func replayCapture(c *capture.Capture) error {
 	urlStr := c.Request.URL
 	if replayURL != "" {
 		urlStr = replayURL

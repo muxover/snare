@@ -74,7 +74,7 @@ func buildHAR(captures []*capture.Capture) map[string]interface{} {
 	return map[string]interface{}{
 		"log": map[string]interface{}{
 			"version": "1.2",
-			"creator": map[string]interface{}{"name": "snare", "version": "1.2.0"},
+			"creator": map[string]interface{}{"name": "snare", "version": Version},
 			"entries": entries,
 		},
 	}

@@ -4,13 +4,13 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/tls"
+	"github.com/muxover/snare/capture"
+	"github.com/muxover/snare/proxy/cert"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"github.com/muxover/snare/capture"
-	"github.com/muxover/snare/proxy/cert"
 	"strconv"
 	"strings"
 	"time"
@@ -19,11 +19,24 @@ import (
 )
 
 type Handler struct {
-	Transport  *http.Transport
-	Store      *capture.Store
-	HostCerts  *cert.HostCertCache
-	Log        *slog.Logger
-	MitmEnable bool
+	Transport     *http.Transport
+	Store         *capture.Store
+	HostCerts     *cert.HostCertCache
+	Log           *slog.Logger
+	MitmEnable    bool
+	HostRewrites  []HostRewrite
+	AddHeaders    []HeaderValue
+	RemoveHeaders []string
+}
+
+type HostRewrite struct {
+	From string
+	To   string
+}
+
+type HeaderValue struct {
+	Key   string
+	Value string
 }
 
 func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -68,6 +81,7 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 	outReq.Header = req.Header.Clone()
 	outReq.Host = req.Host
+	h.applyOutboundMods(outReq)
 
 	resp, err := h.Transport.RoundTrip(outReq)
 	duration := time.Since(start)
@@ -241,6 +255,7 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 		}
 		req.URL.Scheme = "https"
 		req.URL.Host = hostname
+		h.applyOutboundMods(req)
 
 		start := time.Now()
 		capID := uuid.New().String()
@@ -300,5 +315,35 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 		respBytes := bytes.NewBuffer(nil)
 		_ = resp.Write(respBytes)
 		_, _ = clientConn.Write(respBytes.Bytes())
+	}
+}
+
+func (h *Handler) applyOutboundMods(req *http.Request) {
+	h.applyHostRewrite(req)
+	for _, key := range h.RemoveHeaders {
+		req.Header.Del(key)
+	}
+	for _, kv := range h.AddHeaders {
+		req.Header.Set(kv.Key, kv.Value)
+	}
+}
+
+func (h *Handler) applyHostRewrite(req *http.Request) {
+	if req.URL == nil || req.URL.Host == "" || len(h.HostRewrites) == 0 {
+		return
+	}
+	currentHost := req.URL.Hostname()
+	currentPort := req.URL.Port()
+	for _, rule := range h.HostRewrites {
+		if !strings.EqualFold(currentHost, rule.From) {
+			continue
+		}
+		targetHost := rule.To
+		if _, _, err := net.SplitHostPort(rule.To); err != nil && currentPort != "" {
+			targetHost = net.JoinHostPort(rule.To, currentPort)
+		}
+		req.URL.Host = targetHost
+		req.Host = targetHost
+		return
 	}
 }

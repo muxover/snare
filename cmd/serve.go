@@ -9,8 +9,10 @@ import (
 	"github.com/muxover/snare/proxy/cert"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -18,12 +20,16 @@ import (
 )
 
 var (
-	servePort        string
-	serveBind        string
-	serveNoMITM      bool
-	serveStoreDir    string
-	serveVerbose     bool
-	serveMaxCaptures int
+	servePort          string
+	serveBind          string
+	serveNoMITM        bool
+	serveStoreDir      string
+	serveVerbose       bool
+	serveMaxCaptures   int
+	serveUpstreamProxy string
+	serveRewriteHost   []string
+	serveAddHeader     []string
+	serveRemoveHeader  []string
 )
 
 var serveCmd = &cobra.Command{
@@ -40,6 +46,10 @@ func init() {
 	serveCmd.Flags().StringVar(&serveStoreDir, "store-dir", "", "Directory to save each capture (default: SNARE_STORE or ~/.snare/captures)")
 	serveCmd.Flags().BoolVarP(&serveVerbose, "verbose", "v", false, "Enable debug logging (connection-level and verbose output)")
 	serveCmd.Flags().IntVar(&serveMaxCaptures, "max-captures", 1000, "Maximum number of captures to keep (oldest files pruned when exceeded)")
+	serveCmd.Flags().StringVar(&serveUpstreamProxy, "upstream-proxy", "", "Send outbound traffic through this proxy URL (http://host:port)")
+	serveCmd.Flags().StringArrayVar(&serveRewriteHost, "rewrite-host", nil, "Rewrite outbound host using from=to (repeatable)")
+	serveCmd.Flags().StringArrayVar(&serveAddHeader, "add-header", nil, "Add or override outbound header (Key: Value); repeatable")
+	serveCmd.Flags().StringArrayVar(&serveRemoveHeader, "remove-header", nil, "Remove outbound header by name; repeatable")
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
@@ -62,7 +72,20 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 	store := capture.NewStore(maxCap, storeDir)
 
-	transport := proxy.ProxyTransport(true)
+	rewrites, err := parseHostRewriteRules(serveRewriteHost)
+	if err != nil {
+		return err
+	}
+	addHeaders, err := parseHeaderPairs(serveAddHeader)
+	if err != nil {
+		return err
+	}
+	removeHeaders := normalizeHeaderNames(serveRemoveHeader)
+
+	transport, err := proxy.ProxyTransport(true, serveUpstreamProxy)
+	if err != nil {
+		return err
+	}
 	logLevel := slog.LevelInfo
 	if serveVerbose {
 		logLevel = slog.LevelDebug
@@ -82,11 +105,14 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 
 	handler := &proxy.Handler{
-		Transport:  transport,
-		Store:      store,
-		HostCerts:  hostCerts,
-		Log:        log,
-		MitmEnable: mitmEnable,
+		Transport:     transport,
+		Store:         store,
+		HostCerts:     hostCerts,
+		Log:           log,
+		MitmEnable:    mitmEnable,
+		HostRewrites:  rewrites,
+		AddHeaders:    addHeaders,
+		RemoveHeaders: removeHeaders,
 	}
 
 	addr := serveBind + ":" + servePort
@@ -143,4 +169,50 @@ func parsePort(s string) (string, error) {
 		return "", fmt.Errorf("invalid port: %q (must be 1-65535)", s)
 	}
 	return s, nil
+}
+
+func parseHostRewriteRules(items []string) ([]proxy.HostRewrite, error) {
+	out := make([]proxy.HostRewrite, 0, len(items))
+	for _, item := range items {
+		parts := strings.SplitN(item, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid --rewrite-host value %q (expected from=to)", item)
+		}
+		from := strings.TrimSpace(parts[0])
+		to := strings.TrimSpace(parts[1])
+		if from == "" || to == "" {
+			return nil, fmt.Errorf("invalid --rewrite-host value %q (expected from=to)", item)
+		}
+		out = append(out, proxy.HostRewrite{From: from, To: to})
+	}
+	return out, nil
+}
+
+func parseHeaderPairs(items []string) ([]proxy.HeaderValue, error) {
+	out := make([]proxy.HeaderValue, 0, len(items))
+	for _, item := range items {
+		parts := strings.SplitN(item, ":", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid --add-header value %q (expected Key: Value)", item)
+		}
+		key := strings.TrimSpace(parts[0])
+		val := strings.TrimSpace(parts[1])
+		if key == "" {
+			return nil, fmt.Errorf("invalid --add-header value %q (missing header name)", item)
+		}
+		out = append(out, proxy.HeaderValue{Key: key, Value: val})
+	}
+	return out, nil
+}
+
+func normalizeHeaderNames(items []string) []string {
+	out := make([]string, 0, len(items))
+	for _, key := range items {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		out = append(out, http.CanonicalHeaderKey(key))
+	}
+	return out
 }
