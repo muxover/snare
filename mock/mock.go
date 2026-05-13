@@ -28,8 +28,8 @@ func (r *Rule) Matches(req *http.Request) bool {
 }
 
 type Store struct {
-	mu   sync.RWMutex
-	path string
+	mu    sync.RWMutex
+	path  string
 	rules []*Rule
 }
 

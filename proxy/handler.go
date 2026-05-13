@@ -114,6 +114,10 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 	outReq.Host = req.Host
 	h.applyOutboundMods(outReq)
 
+	if isWebSocketUpgrade(outReq) && h.tryServeHTTPWebSocket(rw, outReq, capID, start, bodyBuf) {
+		return
+	}
+
 	resp, err := h.Transport.RoundTrip(outReq)
 	duration := time.Since(start)
 	if err != nil {
@@ -183,6 +187,112 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 	rw.WriteHeader(resp.StatusCode)
 	_, _ = rw.Write(respBody)
+}
+
+func (h *Handler) tryServeHTTPWebSocket(rw http.ResponseWriter, outReq *http.Request, capID string, start time.Time, bodyBuf []byte) bool {
+	hj, ok := rw.(http.Hijacker)
+	if !ok {
+		return false
+	}
+	host := outReq.URL.Hostname()
+	port := outReq.URL.Port()
+	if port == "" {
+		if strings.EqualFold(outReq.URL.Scheme, "https") {
+			port = "443"
+		} else {
+			port = "80"
+		}
+	}
+	addr := net.JoinHostPort(host, port)
+	dialer := &net.Dialer{Timeout: 15 * time.Second}
+	var oc net.Conn
+	var err error
+	if strings.EqualFold(outReq.URL.Scheme, "https") {
+		oc, err = tls.DialWithDialer(dialer, "tcp", addr, &tls.Config{InsecureSkipVerify: true, NextProtos: []string{"http/1.1", "http/1.0"}})
+	} else {
+		oc, err = dialer.Dial("tcp", addr)
+	}
+	if err != nil {
+		h.Log.Error("ws dial origin", "addr", addr, "err", err)
+		return false
+	}
+	if err := outReq.Write(oc); err != nil {
+		oc.Close()
+		h.Log.Error("ws write origin", "err", err)
+		return false
+	}
+	if len(bodyBuf) > 0 {
+		if _, err := oc.Write(bodyBuf); err != nil {
+			oc.Close()
+			return false
+		}
+	}
+	originBR := bufio.NewReader(oc)
+	resp, err := http.ReadResponse(originBR, outReq)
+	if err != nil || !isWebSocketAcceptResponse(resp) {
+		if err == nil && resp != nil {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			resp.Body.Close()
+		}
+		oc.Close()
+		return false
+	}
+	respBody, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+
+	reqCaptureBody := decompressBody(bodyBuf, outReq.Header.Get("Content-Encoding"))
+	reqHeaders := outReq.Header.Clone()
+	if len(reqCaptureBody) != len(bodyBuf) {
+		reqHeaders.Del("Content-Encoding")
+		reqHeaders.Set("Content-Length", strconv.Itoa(len(reqCaptureBody)))
+	}
+	captureBody := decompressBody(respBody, resp.Header.Get("Content-Encoding"))
+	respHeaders := resp.Header.Clone()
+	if len(captureBody) != len(respBody) {
+		respHeaders.Del("Content-Encoding")
+		respHeaders.Set("Content-Length", strconv.Itoa(len(captureBody)))
+	}
+	c := &capture.Capture{
+		ID:        capID,
+		Timestamp: start,
+		Protocol:  "h1",
+		Request: capture.RequestSnapshot{
+			Method:  outReq.Method,
+			URL:     outReq.URL.String(),
+			Headers: reqHeaders,
+			Body:    capture.BodyBytes(reqCaptureBody),
+		},
+		Response: &capture.ResponseSnapshot{
+			StatusCode: resp.StatusCode,
+			Headers:    respHeaders,
+			Body:       capture.BodyBytes(captureBody),
+		},
+		Duration: time.Since(start),
+	}
+	brw, _, err := hj.Hijack()
+	if err != nil {
+		oc.Close()
+		return false
+	}
+	resp.Body = io.NopCloser(bytes.NewReader(respBody))
+	var wire bytes.Buffer
+	if err := resp.Write(&wire); err != nil {
+		brw.Close()
+		oc.Close()
+		return false
+	}
+	if _, err := brw.Write(wire.Bytes()); err != nil {
+		brw.Close()
+		oc.Close()
+		return false
+	}
+	clientBR := bufio.NewReader(brw)
+	h.relayWebSocketRFC6455(c, clientBR, brw, originBR, oc, true, func() {
+		_ = brw.Close()
+		_ = oc.Close()
+	})
+	h.Log.Info("websocket", "url", outReq.URL.String(), "id", capID[:8], "proto", "h1-proxy")
+	return true
 }
 
 func (h *Handler) serveCONNECT(rw http.ResponseWriter, req *http.Request) {
@@ -341,7 +451,7 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 			respHeaders.Del("Content-Encoding")
 			respHeaders.Set("Content-Length", strconv.Itoa(len(captureBody)))
 		}
-		h.addCapture(&capture.Capture{
+		c := &capture.Capture{
 			ID:        capID,
 			Timestamp: start,
 			Protocol:  "h1",
@@ -357,7 +467,17 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 				Body:       capture.BodyBytes(captureBody),
 			},
 			Duration: duration,
-		})
+		}
+		if isWebSocketUpgrade(req) && isWebSocketAcceptResponse(resp) {
+			h.Log.Info("websocket", "url", req.URL.String(), "id", capID[:8])
+			resp.Body = io.NopCloser(bytes.NewReader(respBody))
+			respBytes := bytes.NewBuffer(nil)
+			_ = resp.Write(respBytes)
+			_, _ = clientConn.Write(respBytes.Bytes())
+			h.relayWebSocketCapture(c, clientReader, clientConn, originReader, originConn)
+			return
+		}
+		h.addCapture(c)
 		h.Log.Info("captured", "method", req.Method, "url", req.URL.String(), "status", resp.StatusCode, "id", capID[:8])
 
 		resp.Body = io.NopCloser(bytes.NewReader(respBody))

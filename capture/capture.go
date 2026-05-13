@@ -42,6 +42,18 @@ type Capture struct {
 	Response  *ResponseSnapshot `json:"response,omitempty"`
 	Duration  time.Duration     `json:"duration_ns,omitempty"`
 	Error     string            `json:"error,omitempty"`
+	WebSocket *WebSocketCapture `json:"websocket,omitempty"`
+}
+
+type WebSocketCapture struct {
+	Frames []WSFrame `json:"frames,omitempty"`
+}
+
+type WSFrame struct {
+	Timestamp time.Time `json:"timestamp"`
+	Direction string    `json:"direction"`
+	Opcode    int       `json:"opcode"`
+	Payload   BodyBytes `json:"payload,omitempty"`
 }
 
 type RequestSnapshot struct {

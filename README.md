@@ -24,6 +24,7 @@ Snare is a local HTTP/HTTPS proxy you run on your machine. Point `HTTP_PROXY` an
 - Stream captures as NDJSON (`snare pipe`) for use with `jq` and shell scripts
 - CI assertions on captures (`snare assert`) with exit codes
 - Hook any shell command on every new capture (`--on-capture`)
+- WebSocket over HTTPS MITM (HTTP/1.1 `101` and HTTP/2 extended CONNECT per RFC 8441) plus `ws://` / `wss://` through cleartext `serveHTTP` (dial + hijack); frames in captures and HAR export
 - Body decompression (gzip, deflate, brotli) for readable captures
 - CA generate and install for trusting the proxy on your system
 - Upstream proxy chaining, host rewrite rules, and outbound header rewrite/remove
@@ -70,7 +71,7 @@ snare replay <id>
 | `snare serve` | Start the proxy (default port 8888; supports `--upstream-proxy`, `--rewrite-host`, `--add-header`, `--remove-header`) |
 | `snare list` | List recent captures (filters: `--method`, `--status`, `--url`, `--host`, `--since`, `--until`, `--body`; shows duration) |
 | `snare watch` | Print new captures as they arrive (`--interval`) |
-| `snare show [id]` | Show full request/response for a capture |
+| `snare show [id]` | Show full request/response; WebSocket sessions append a frame list when captured |
 | `snare diff [id-a] [id-b]` | Compare two captures |
 | `snare replay [id]` | Re-send one capture by ID, or replay all URL matches with `--match` (optional `-u` URL, `-H` headers, `-n` repeat) |
 | `snare import [file.har]` | Import HAR entries into the capture store |
@@ -87,7 +88,7 @@ snare replay <id>
 | `snare pipe` | Stream all captures as NDJSON; use `--follow` to tail new arrivals |
 | `snare assert` | Assert capture conditions (`--url`, `--method`, `--status`, `--min`, `--max`); exits 1 on failure |
 | `snare save [id]` | Save one or more captures to a JSON file (`-o`, `--all`) |
-| `snare export` | Export last N captures to JSON or HAR (`-f json|har`, `-n`) |
+| `snare export` | Export last N captures to JSON or HAR (`-f json|har`, `-n`); HAR includes `_webSocketMessages` when frames exist |
 | `snare clear` | Delete all captures from the store |
 | `snare delete [id]` | Delete one capture by ID or prefix |
 | `snare ca generate` | Generate CA certificate if missing |

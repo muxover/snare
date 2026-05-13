@@ -7,6 +7,7 @@ desktop.ini
 .vscode/
 .idea/
 .cursor/
+.claude/
 *.swp
 *.swo
 *~
@@ -20,6 +21,10 @@ desktop.ini
 
 # Go
 vendor/
+
+# Snare CLI output (default export names)
+export.json
+export.har
 
 # Secrets
 .env

@@ -259,7 +259,6 @@ func buildOnCapture(cmd string) func(*capture.Capture) {
 	}
 }
 
-
 func normalizeHeaderNames(items []string) []string {
 	out := make([]string, 0, len(items))
 	for _, key := range items {

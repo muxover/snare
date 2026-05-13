@@ -6,9 +6,9 @@ import (
 )
 
 const (
-	DefaultStoreDir    = ".snare/captures"
-	DefaultCADir       = ".snare"
-	DefaultMockFile    = ".snare/mocks.json"
+	DefaultStoreDir     = ".snare/captures"
+	DefaultCADir        = ".snare"
+	DefaultMockFile     = ".snare/mocks.json"
 	DefaultInterceptDir = ".snare/intercept"
 )
 

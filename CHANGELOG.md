@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-05-13
+
+### Added
+
+- WebSocket capture for HTTPS MITM: the HTTP upgrade handshake (HTTP/1.1 `101` or HTTP/2 extended CONNECT with `200`) is stored like a normal capture; after the connection closes, per-frame records (`c2s` / `s2c`, opcode, payload, timestamp) are attached under `websocket.frames` in the capture JSON.
+- MITM **HTTP/1.1** path: `101 Switching Protocols`, RFC6455 frames on the wire (masked client → origin).
+- MITM **HTTP/2** path (RFC 8441): `CONNECT` with `:protocol` websocket; client stream uses unmasked RFC6455 payloads in HTTP/2 DATA; Snare completes the origin leg with an HTTP/1.1 WebSocket upgrade on a separate TLS connection, then relays frames both ways.
+- **Cleartext proxy** (`serveHTTP`, absolute `http://` / `https://` URLs): WebSocket upgrades use a direct dial to the origin plus `Hijack` on the client connection so the tunnel is not returned to the transport pool before relaying.
+- `snare show` prints WebSocket frames after the response section when present.
+- HAR export adds a `_webSocketMessages` array on entries that have frames (Chrome-compatible shape: `type`, `time`, `opcode`, `data`).
+
 ## [1.6.0] - 2026-05-02
 
 ### Added
@@ -84,7 +95,8 @@ First release.
 - Body decompression (gzip, deflate, brotli) for readable captures.
 - Config via `SNARE_STORE`, `SNARE_CA` and serve flags (port, bind, max-captures).
 
-[Unreleased]: https://github.com/muxover/snare/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/muxover/snare/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/muxover/snare/releases/tag/v1.7.0
 [1.6.0]: https://github.com/muxover/snare/releases/tag/v1.6.0
 [1.5.0]: https://github.com/muxover/snare/releases/tag/v1.5.0
 [1.4.0]: https://github.com/muxover/snare/releases/tag/v1.4.0

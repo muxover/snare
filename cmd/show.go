@@ -2,6 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
+	"unicode/utf8"
+
 	"github.com/muxover/snare/capture"
 	"github.com/muxover/snare/config"
 
@@ -50,5 +53,51 @@ func runShow(cmd *cobra.Command, args []string) error {
 		fmt.Println("Error:", c.Error)
 	}
 	fmt.Printf("\nDuration: %s\n", c.Duration)
+	if c.WebSocket != nil && len(c.WebSocket.Frames) > 0 {
+		fmt.Println("\n=== WebSocket frames ===")
+		for _, f := range c.WebSocket.Frames {
+			fmt.Printf("%s  %-4s  op=%d (%s)  %s\n",
+				f.Timestamp.Format("15:04:05.000"),
+				f.Direction,
+				f.Opcode,
+				wsOpcodeLabel(f.Opcode),
+				wsPayloadPreview(f.Payload),
+			)
+		}
+	}
 	return nil
+}
+
+func wsOpcodeLabel(op int) string {
+	switch op {
+	case 0:
+		return "cont"
+	case 1:
+		return "text"
+	case 2:
+		return "bin"
+	case 8:
+		return "close"
+	case 9:
+		return "ping"
+	case 10:
+		return "pong"
+	default:
+		return "?"
+	}
+}
+
+func wsPayloadPreview(b []byte) string {
+	if len(b) == 0 {
+		return ""
+	}
+	const max = 2048
+	s := string(b)
+	if !utf8.Valid(b) {
+		return fmt.Sprintf("[%d bytes binary]", len(b))
+	}
+	if len(s) > max {
+		return s[:max] + "…"
+	}
+	return strings.ReplaceAll(s, "\n", "\\n")
 }

@@ -47,7 +47,7 @@ func LoadOrCreateCA(dir string) (*x509.Certificate, *ecdsa.PrivateKey, error) {
 		SerialNumber: serial,
 		Subject: pkix.Name{
 			Organization: []string{"Proxy CA"},
-			CommonName:    "Proxy Root CA",
+			CommonName:   "Proxy Root CA",
 		},
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(10 * 365 * 24 * time.Hour),

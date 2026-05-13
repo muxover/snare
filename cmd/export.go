@@ -1,12 +1,15 @@
 package cmd
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/muxover/snare/capture"
-	"github.com/muxover/snare/config"
 	"os"
 	"time"
+	"unicode/utf8"
+
+	"github.com/muxover/snare/capture"
+	"github.com/muxover/snare/config"
 
 	"github.com/spf13/cobra"
 )
@@ -69,6 +72,9 @@ func buildHAR(captures []*capture.Capture) map[string]interface{} {
 				"bodySize": len(c.Response.Body),
 			}
 		}
+		if c.WebSocket != nil && len(c.WebSocket.Frames) > 0 {
+			ent["_webSocketMessages"] = websocketMessagesHAR(c.WebSocket.Frames)
+		}
 		entries = append(entries, ent)
 	}
 	return map[string]interface{}{
@@ -88,4 +94,31 @@ func headersToHAR(h map[string][]string) []map[string]string {
 		}
 	}
 	return out
+}
+
+func websocketMessagesHAR(frames []capture.WSFrame) []map[string]interface{} {
+	out := make([]map[string]interface{}, 0, len(frames))
+	for _, f := range frames {
+		typ := "send"
+		if f.Direction == "s2c" {
+			typ = "receive"
+		}
+		out = append(out, map[string]interface{}{
+			"type":   typ,
+			"time":   f.Timestamp.UnixMilli(),
+			"opcode": f.Opcode,
+			"data":   harWSDataString(f.Payload),
+		})
+	}
+	return out
+}
+
+func harWSDataString(b []byte) string {
+	if len(b) == 0 {
+		return ""
+	}
+	if utf8.Valid(b) {
+		return string(b)
+	}
+	return base64.StdEncoding.EncodeToString(b)
 }

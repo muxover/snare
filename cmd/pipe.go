@@ -79,4 +79,3 @@ func runPipe(cmd *cobra.Command, args []string) error {
 		}
 	}
 }
-
