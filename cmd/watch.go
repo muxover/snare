@@ -10,21 +10,32 @@ import (
 
 	"github.com/muxover/snare/capture"
 	"github.com/muxover/snare/config"
-
 	"github.com/spf13/cobra"
 )
 
-var watchPoll time.Duration
+var (
+	watchPoll   time.Duration
+	watchMethod string
+	watchStatus int
+	watchURL    string
+	watchHost   string
+	watchBody   string
+)
 
 var watchCmd = &cobra.Command{
 	Use:   "watch",
 	Short: "Print new captures as they are saved",
-	Long:  "Poll the capture store and print one line per new capture (same columns as list). Use Ctrl+C to stop.",
+	Long:  "Poll the capture store and print one line per new capture. Supports the same filters as list. Use Ctrl+C to stop.",
 	RunE:  runWatch,
 }
 
 func init() {
-	watchCmd.Flags().DurationVar(&watchPoll, "interval", 500*time.Millisecond, "")
+	watchCmd.Flags().DurationVar(&watchPoll, "interval", 500*time.Millisecond, "Poll interval")
+	watchCmd.Flags().StringVar(&watchMethod, "method", "", "Filter by HTTP method")
+	watchCmd.Flags().IntVar(&watchStatus, "status", 0, "Filter by response status code")
+	watchCmd.Flags().StringVar(&watchURL, "url", "", "Filter by URL substring")
+	watchCmd.Flags().StringVar(&watchHost, "host", "", "Filter by host")
+	watchCmd.Flags().StringVar(&watchBody, "body", "", "Filter by substring in request or response body")
 }
 
 const minWatchInterval = 100 * time.Millisecond
@@ -67,7 +78,8 @@ func runWatch(cmd *cobra.Command, args []string) error {
 			sort.Slice(fresh, func(i, j int) bool {
 				return fresh[i].Timestamp.Before(fresh[j].Timestamp)
 			})
-			for _, c := range fresh {
+			filtered := filterCaptures(fresh, watchMethod, watchStatus, watchURL, watchHost, watchBody, time.Time{}, time.Time{})
+			for _, c := range filtered {
 				printCaptureLine(c)
 			}
 		}

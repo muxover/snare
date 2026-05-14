@@ -2,9 +2,12 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/muxover/snare/capture"
@@ -18,6 +21,7 @@ var (
 	replayURL    string
 	replayHeader []string
 	replayMatch  string
+	replayEdit   bool
 )
 
 var replayCmd = &cobra.Command{
@@ -33,6 +37,7 @@ func init() {
 	replayCmd.Flags().StringVarP(&replayURL, "url", "u", "", "Override URL (optional)")
 	replayCmd.Flags().StringSliceVarP(&replayHeader, "header", "H", nil, "Add or override header (Key: Value); can be repeated")
 	replayCmd.Flags().StringVar(&replayMatch, "match", "", "Replay all captures whose URL contains this substring")
+	replayCmd.Flags().BoolVar(&replayEdit, "edit", false, "Open capture in $EDITOR before resending")
 }
 
 func runReplay(cmd *cobra.Command, args []string) error {
@@ -74,7 +79,14 @@ func runReplay(cmd *cobra.Command, args []string) error {
 			}
 			fmt.Printf("Replaying [%s] %s %s\n", short, c.Request.Method, c.Request.URL)
 		}
-		if err := replayCapture(c); err != nil {
+		if replayEdit {
+			edited, err := editCapture(c)
+			if err != nil {
+				return err
+			}
+			c = edited
+		}
+		if err := replayCaptureOnce(c); err != nil {
 			return err
 		}
 		if idx < len(targets)-1 {
@@ -84,7 +96,53 @@ func runReplay(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func replayCapture(c *capture.Capture) error {
+func editCapture(c *capture.Capture) (*capture.Capture, error) {
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		editor = os.Getenv("VISUAL")
+	}
+	if editor == "" {
+		return nil, fmt.Errorf("$EDITOR is not set")
+	}
+
+	data, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+
+	tmp, err := os.CreateTemp("", "snare-edit-*.json")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(tmp.Name())
+
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return nil, err
+	}
+	tmp.Close()
+
+	proc := exec.Command(editor, tmp.Name())
+	proc.Stdin = os.Stdin
+	proc.Stdout = os.Stdout
+	proc.Stderr = os.Stderr
+	if err := proc.Run(); err != nil {
+		return nil, fmt.Errorf("editor exited with error: %w", err)
+	}
+
+	edited, err := os.ReadFile(tmp.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	var out capture.Capture
+	if err := json.Unmarshal(edited, &out); err != nil {
+		return nil, fmt.Errorf("edited JSON is invalid: %w", err)
+	}
+	return &out, nil
+}
+
+func replayCaptureOnce(c *capture.Capture) error {
 	urlStr := c.Request.URL
 	if replayURL != "" {
 		urlStr = replayURL
@@ -122,4 +180,8 @@ func replayCapture(c *capture.Capture) error {
 		}
 	}
 	return nil
+}
+
+func replayCapture(c *capture.Capture) error {
+	return replayCaptureOnce(c)
 }

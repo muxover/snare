@@ -2,18 +2,21 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/muxover/snare/config"
-	"github.com/muxover/snare/proxy/cert"
+	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
 
+	"github.com/muxover/snare/config"
+	"github.com/muxover/snare/proxy/cert"
 	"github.com/spf13/cobra"
 )
 
 var caCmd = &cobra.Command{
 	Use:   "ca",
 	Short: "CA certificate commands",
-	Long:  "Manage the proxy's CA certificate used for HTTPS MITM. generate: create CA if missing. install: print instructions to trust the CA on your system.",
+	Long:  "Manage the proxy's CA certificate used for HTTPS MITM. generate: create CA if missing. install: add the CA to your system trust store.",
 }
 
 var caGenerateCmd = &cobra.Command{
@@ -24,7 +27,7 @@ var caGenerateCmd = &cobra.Command{
 
 var caInstallCmd = &cobra.Command{
 	Use:   "install",
-	Short: "Print instructions to install CA in system trust store",
+	Short: "Install CA into system trust store",
 	RunE:  runCAInstall,
 }
 
@@ -45,23 +48,70 @@ func runCAGenerate(cmd *cobra.Command, args []string) error {
 
 func runCAInstall(cmd *cobra.Command, args []string) error {
 	dir := config.CADir()
-	certPath := dir + "/" + cert.CertFile
+	certPath := filepath.Join(dir, cert.CertFile)
 	if _, err := os.Stat(certPath); os.IsNotExist(err) {
 		fmt.Println("Run 'snare ca generate' first.")
 		return nil
 	}
-	fmt.Println("To trust Snare for HTTPS MITM, install the CA certificate:")
-	fmt.Println("  Certificate file:", certPath)
-	fmt.Println()
+
 	switch runtime.GOOS {
 	case "windows":
-		fmt.Println("Windows: Double-click ca.pem → Install Certificate → Local Machine → Trusted Root CAs")
+		return installWindows(certPath)
 	case "darwin":
-		fmt.Println("macOS: sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain " + certPath)
+		return installDarwin(certPath)
 	case "linux":
-		fmt.Println("Linux: copy to /usr/local/share/ca-certificates/ and run sudo update-ca-certificates")
+		return installLinux(certPath)
 	default:
-		fmt.Println("Import", certPath, "into your system or browser trust store.")
+		fmt.Println("Unsupported OS. Import manually:", certPath)
+		return nil
 	}
+}
+
+func installWindows(certPath string) error {
+	fmt.Println("Installing CA into Windows trusted root store...")
+	out, err := exec.Command("certutil", "-addstore", "-f", "Root", certPath).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("certutil failed: %w\n%s", err, out)
+	}
+	fmt.Println("Installed. You may need to restart your browser.")
+	return nil
+}
+
+func installDarwin(certPath string) error {
+	fmt.Println("Installing CA into macOS system keychain...")
+	out, err := exec.Command("sudo", "security", "add-trusted-cert", "-d", "-r", "trustRoot", "-k", "/Library/Keychains/System.keychain", certPath).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("security command failed: %w\n%s", err, out)
+	}
+	fmt.Println("Installed.")
+	return nil
+}
+
+func installLinux(certPath string) error {
+	dest := "/usr/local/share/ca-certificates/snare-ca.crt"
+	fmt.Printf("Copying CA to %s...\n", dest)
+
+	src, err := os.Open(certPath)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	dst, err := os.Create(dest)
+	if err != nil {
+		return fmt.Errorf("cannot write to %s (try sudo): %w", dest, err)
+	}
+	defer dst.Close()
+
+	if _, err := io.Copy(dst, src); err != nil {
+		return err
+	}
+
+	fmt.Println("Running update-ca-certificates...")
+	out, err := exec.Command("update-ca-certificates").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("update-ca-certificates failed: %w\n%s", err, out)
+	}
+	fmt.Println("Installed.")
 	return nil
 }

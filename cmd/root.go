@@ -4,12 +4,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const Version = "1.7.0"
+const Version = "1.8.0"
 
 var rootCmd = &cobra.Command{
 	Use:   "snare",
 	Short: "HTTP/HTTPS proxy that intercepts and captures requests",
-	Long:  "Snare is a CLI that runs a local HTTP/HTTPS proxy to intercept, capture, save, and replay traffic. Point HTTP_PROXY/HTTPS_PROXY at it and inspect or replay every request.",
+	Long:  "Snare is a lightweight CLI proxy for intercepting, inspecting, and replaying HTTP/HTTPS traffic from the terminal.",
 }
 
 func Execute() error {
@@ -37,4 +37,5 @@ func init() {
 	rootCmd.AddCommand(clearCmd)
 	rootCmd.AddCommand(deleteCmd)
 	rootCmd.AddCommand(caCmd)
+	rootCmd.AddCommand(grepCmd)
 }

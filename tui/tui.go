@@ -23,6 +23,7 @@ var (
 	styleErr    = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
 	styleDim    = lipgloss.NewStyle().Faint(true)
 	styleSec    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("14"))
+	styleWS     = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
 )
 
 type viewState int
@@ -352,11 +353,51 @@ func renderDetail(c *capture.Capture, width int) string {
 		}
 	}
 
+	if c.WebSocket != nil && len(c.WebSocket.Frames) > 0 {
+		b.WriteString("\n" + styleSec.Render("── WebSocket Frames ") + strings.Repeat("─", max(0, width-21)) + "\n")
+		for _, f := range c.WebSocket.Frames {
+			dir := "→"
+			if f.Direction == "server" {
+				dir = "←"
+			}
+			ts := f.Timestamp.Format("15:04:05.000")
+			opcode := wsOpcodeName(f.Opcode)
+			header := styleWS.Render(fmt.Sprintf("%s %s %s", dir, ts, opcode))
+			b.WriteString(header + "\n")
+			if len(f.Payload) > 0 {
+				payload := string(f.Payload)
+				if len(payload) > 512 {
+					payload = payload[:512] + "…"
+				}
+				b.WriteString(styleDim.Render(payload) + "\n")
+			}
+		}
+	}
+
 	if c.Error != "" {
 		b.WriteString("\n" + styleErr.Render("Error: "+c.Error) + "\n")
 	}
 
 	return b.String()
+}
+
+func wsOpcodeName(op int) string {
+	switch op {
+	case 0:
+		return "continuation"
+	case 1:
+		return "text"
+	case 2:
+		return "binary"
+	case 8:
+		return "close"
+	case 9:
+		return "ping"
+	case 10:
+		return "pong"
+	default:
+		return fmt.Sprintf("op%d", op)
+	}
 }
 
 func replayCapture(c *capture.Capture) {

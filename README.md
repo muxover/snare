@@ -5,29 +5,13 @@
 [![CI](https://github.com/muxover/snare/actions/workflows/ci.yml/badge.svg)](https://github.com/muxover/snare/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**HTTP/HTTPS proxy CLI that intercepts, captures, and replays traffic.**
+**HTTP/HTTPS proxy CLI — capture, inspect, and replay traffic from your terminal.**
 
 </div>
 
 ---
 
-Snare is a local HTTP/HTTPS proxy you run on your machine. Point `HTTP_PROXY` and `HTTPS_PROXY` at it to capture every request and response. Inspect, save, export (JSON or HAR), and replay requests from the CLI.
-
-## Features
-
-- HTTP and HTTPS (CONNECT) with optional MITM (HTTP/1.1 and HTTP/2)
-- Every request/response saved to disk (JSON per capture)
-- List, watch, diff, show, replay, import, save, export, clear, delete from the CLI
-- Interactive terminal UI (`snare tui`) — live capture list with keyboard navigation
-- Mock rules that intercept matching requests and return fixed responses
-- Request interception — pause, inspect, edit, forward, or drop live requests
-- Stream captures as NDJSON (`snare pipe`) for use with `jq` and shell scripts
-- CI assertions on captures (`snare assert`) with exit codes
-- Hook any shell command on every new capture (`--on-capture`)
-- WebSocket over HTTPS MITM (HTTP/1.1 `101` and HTTP/2 extended CONNECT per RFC 8441) plus `ws://` / `wss://` through cleartext `serveHTTP` (dial + hijack); frames in captures and HAR export
-- Body decompression (gzip, deflate, brotli) for readable captures
-- CA generate and install for trusting the proxy on your system
-- Upstream proxy chaining, host rewrite rules, and outbound header rewrite/remove
+Snare runs as a local proxy and records every HTTP and HTTPS request that passes through it. Each capture is a plain JSON file you can list, filter, search, diff, mock, intercept, and replay with a single command. Forward and reverse proxy in one binary.
 
 ## Installation
 
@@ -35,85 +19,226 @@ Snare is a local HTTP/HTTPS proxy you run on your machine. Point `HTTP_PROXY` an
 go install github.com/muxover/snare@latest
 ```
 
-Or clone and build:
+Build from source:
 
 ```bash
-git clone https://github.com/muxover/snare.git && cd snare && go build -o snare .
+git clone https://github.com/muxover/snare.git
+cd snare
+go build -o snare .
 ```
 
 ## Quick Start
 
-1. Start the proxy:
-
 ```bash
 snare serve
-```
 
-2. Set your proxy and run traffic:
+export HTTP_PROXY=http://127.0.0.1:8888
+export HTTPS_PROXY=http://127.0.0.1:8888
 
-```bash
-export HTTP_PROXY=http://127.0.0.1:8888 HTTPS_PROXY=http://127.0.0.1:8888
-curl -x http://127.0.0.1:8888 http://example.com
-```
+curl https://httpbin.org/get
 
-3. List and inspect captures:
-
-```bash
 snare list
 snare show <id>
 snare replay <id>
 ```
 
+## HTTPS MITM
+
+```bash
+snare ca generate   # writes ~/.snare/ca.pem
+snare ca install    # installs CA into system trust store
+snare serve
+```
+
+`snare ca install` runs the right command per platform: `certutil -addstore Root` on Windows, `security add-trusted-cert` on macOS, `update-ca-certificates` on Linux.
+
+## Reverse Proxy
+
+```bash
+snare serve --mode reverse --target http://localhost:3000
+```
+
+No proxy env vars needed. All traffic to `127.0.0.1:8888` is forwarded to the target and captured.
+
 ## Commands
+
+**Captures**
 
 | Command | Description |
 |---------|-------------|
-| `snare serve` | Start the proxy (default port 8888; supports `--upstream-proxy`, `--rewrite-host`, `--add-header`, `--remove-header`) |
-| `snare list` | List recent captures (filters: `--method`, `--status`, `--url`, `--host`, `--since`, `--until`, `--body`; shows duration) |
-| `snare watch` | Print new captures as they arrive (`--interval`) |
-| `snare show [id]` | Show full request/response; WebSocket sessions append a frame list when captured |
-| `snare diff [id-a] [id-b]` | Compare two captures |
-| `snare replay [id]` | Re-send one capture by ID, or replay all URL matches with `--match` (optional `-u` URL, `-H` headers, `-n` repeat) |
-| `snare import [file.har]` | Import HAR entries into the capture store |
-| `snare mock add` | Add a mock rule (`--url`, `--method`, `--status`, `--body`, `--content-type`, `--header`) |
-| `snare mock from [id]` | Generate a mock rule from a captured response |
-| `snare mock list` | List all mock rules |
-| `snare mock remove [id]` | Remove a mock rule by ID or prefix |
-| `snare mock clear` | Remove all mock rules |
-| `snare intercept list` | List requests currently held by the proxy |
-| `snare intercept forward [id]` | Release a held request to the origin |
-| `snare intercept edit [id]` | Edit a held request in `$EDITOR` then forward it |
-| `snare intercept drop [id]` | Drop a held request (client receives 502) |
-| `snare tui` | Interactive terminal UI — live capture list, inspect, replay with keyboard nav |
-| `snare pipe` | Stream all captures as NDJSON; use `--follow` to tail new arrivals |
-| `snare assert` | Assert capture conditions (`--url`, `--method`, `--status`, `--min`, `--max`); exits 1 on failure |
-| `snare save [id]` | Save one or more captures to a JSON file (`-o`, `--all`) |
-| `snare export` | Export last N captures to JSON or HAR (`-f json|har`, `-n`); HAR includes `_webSocketMessages` when frames exist |
-| `snare clear` | Delete all captures from the store |
-| `snare delete [id]` | Delete one capture by ID or prefix |
-| `snare ca generate` | Generate CA certificate if missing |
-| `snare ca install` | Print instructions to install CA in system trust store |
+| `snare list` | List captures with filters and colorized output |
+| `snare watch` | Tail new captures as they arrive |
+| `snare show <id>` | Full request/response detail; WebSocket frames when present |
+| `snare diff <a> <b>` | Diff two captures |
+| `snare grep <pattern>` | Regex search across all capture bodies |
+| `snare clear` | Delete captures (all, or filtered by method/status/url/host) |
+| `snare delete <id>` | Delete a single capture |
 
-## Configuration
+**Replay**
 
-| Env / flag | Description |
-|------------|-------------|
-| `SNARE_STORE` | Directory for capture files (default: `~/.snare/captures`) |
-| `SNARE_CA` | Directory for CA certs (default: `~/.snare`) |
-| `--port`, `-p` | Port (default: 8888) |
-| `--bind`, `-b` | Bind address (default: 127.0.0.1; use 0.0.0.0 for all interfaces) |
-| `--no-mitm` | Disable HTTPS MITM; CONNECT is tunneled only |
-| `--max-captures` | Max captures to keep; oldest pruned (default: 1000) |
-| `--upstream-proxy` | Forward outbound traffic through another proxy URL |
-| `--rewrite-host` | Rewrite outbound host with `from=to` (repeatable) |
-| `--add-header` | Add or override outbound header (`Key: Value`, repeatable) |
-| `--remove-header` | Remove outbound header by name (repeatable) |
-| `--mock-file` | Load mock rules from this file (default: `SNARE_MOCKS` or `~/.snare/mocks.json`) |
-| `SNARE_MOCKS` | Path to mock rules file |
-| `--intercept` | Intercept requests matching this URL pattern (use `*` for all) |
-| `--intercept-timeout` | How long to wait for a decision before auto-dropping (default: 5m) |
-| `SNARE_INTERCEPT` | Directory for pending intercept files (default: `~/.snare/intercept`) |
-| `--on-capture` | Shell command to run for each new capture; capture JSON is written to its stdin |
+| Command | Description |
+|---------|-------------|
+| `snare replay <id>` | Re-send a captured request |
+| `snare replay --match <str>` | Re-send all captures whose URL contains this string |
+| `snare replay --edit` | Open capture in `$EDITOR` before sending |
+
+**Mock**
+
+| Command | Description |
+|---------|-------------|
+| `snare mock add` | Add a stub rule |
+| `snare mock from <id>` | Generate a stub from a capture |
+| `snare mock list` | List all stubs |
+| `snare mock remove <id>` | Remove a stub |
+| `snare mock clear` | Remove all stubs |
+
+**Intercept**
+
+| Command | Description |
+|---------|-------------|
+| `snare intercept list` | List requests paused by the proxy |
+| `snare intercept forward <id>` | Release a paused request |
+| `snare intercept edit <id>` | Edit then forward a paused request |
+| `snare intercept drop <id>` | Drop a paused request (client receives 502) |
+
+**Import / Export**
+
+| Command | Description |
+|---------|-------------|
+| `snare import <file.har>` | Import a HAR file |
+| `snare save <id>` | Save a capture to a file |
+| `snare export` | Export captures to JSON or HAR |
+
+**Automation**
+
+| Command | Description |
+|---------|-------------|
+| `snare pipe` | Stream captures as NDJSON; `--follow` to tail |
+| `snare assert` | Assert conditions on captures; exits 1 on failure |
+| `snare tui` | Interactive terminal UI |
+
+**CA**
+
+| Command | Description |
+|---------|-------------|
+| `snare ca generate` | Generate CA certificate |
+| `snare ca install` | Install CA into system trust store |
+
+## serve Flags
+
+```
+-p, --port              Port (default: 8888)
+-b, --bind              Bind address (default: 127.0.0.1)
+    --mode              forward (default) or reverse
+    --target            Reverse proxy target URL
+    --no-mitm           Tunnel CONNECT without MITM
+    --max-captures      In-memory cap, oldest pruned (default: 1000)
+    --no-store          Memory only, nothing written to disk
+    --max-body-size     Truncate bodies at N bytes (0 = no limit)
+    --store-dir         Override capture directory
+    --upstream-proxy    Chain through another proxy
+    --rewrite-host      Rewrite outbound host: from=to (repeatable)
+    --add-header        Add or override outbound header: Key: Value (repeatable)
+    --remove-header     Remove outbound header by name (repeatable)
+    --ignore            Skip URLs containing this substring (repeatable)
+    --map-remote        Redirect host: host=http://target (repeatable)
+    --rewrite-body      Rewrite response bodies: regex=replacement (repeatable)
+    --mock-file         Load mock rules from a file
+    --intercept         Pause requests matching this URL pattern (* for all)
+    --intercept-timeout Auto-drop paused requests after this duration (default: 5m)
+    --on-capture        Shell command run per capture; full JSON piped to stdin
+-v, --verbose           Debug logging
+```
+
+## list / watch Flags
+
+```
+--method    HTTP method
+--status    Response status code
+--url       URL substring
+--host      Host
+--body      Substring in request or response body
+--since     Start timestamp (RFC3339)
+--until     End timestamp (RFC3339)
+--limit     Max results (list only)
+--interval  Poll interval (watch only, default: 500ms)
+```
+
+## replay Flags
+
+```
+-n, --repeat  Send N times
+-u, --url     Override URL
+-H, --header  Add or override header (repeatable)
+    --match   Replay all captures matching this URL substring
+    --edit    Open capture in $EDITOR before sending
+```
+
+## clear Flags
+
+```
+--method  Delete only captures with this method
+--status  Delete only captures with this status code
+--url     Delete only captures whose URL contains this substring
+--host    Delete only captures for this host
+```
+
+## grep Flags
+
+```
+<pattern>    Regular expression matched against request and response bodies
+-v, --invert Print captures that do NOT match
+--method     Limit to this HTTP method
+--host       Limit to this host
+```
+
+## Environment
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SNARE_STORE` | `~/.snare/captures` | Capture directory |
+| `SNARE_CA` | `~/.snare` | CA certificate directory |
+| `SNARE_MOCKS` | `~/.snare/mocks.json` | Mock rules file |
+| `SNARE_INTERCEPT` | `~/.snare/intercept` | Intercept queue directory |
+
+## Examples
+
+```bash
+# Filter captures
+snare list --method POST --status 500
+
+# Search bodies
+snare grep '"error"'
+snare grep --invert '"success"'
+
+# Watch live traffic for one host
+snare watch --host api.example.com
+
+# Mock an endpoint
+snare mock add --url /api/payment --status 200 --body '{"ok":true}'
+
+# Intercept and edit a request before it goes out
+snare serve --intercept '*'
+snare intercept list
+snare intercept edit <id>
+snare intercept forward <id>
+
+# Stream to jq
+snare pipe --follow | jq '.request.url'
+
+# CI smoke test
+snare assert --url /api/health --status 200 --min 1
+
+# Ignore health checks
+snare serve --ignore /healthz --ignore /metrics
+
+# Redirect a host to a local server
+snare serve --map-remote api.example.com=http://localhost:4000
+
+# Reverse proxy with body rewrite
+snare serve --mode reverse --target http://localhost:3000 \
+  --rewrite-body 'staging.internal=production.example.com'
+```
 
 ## Contributing
 

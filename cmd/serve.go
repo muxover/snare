@@ -8,9 +8,11 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
+	"regexp"
 	"runtime"
 	"strings"
 	"syscall"
@@ -40,12 +42,19 @@ var (
 	serveIntercept        string
 	serveInterceptTimeout time.Duration
 	serveOnCapture        string
+	serveMode             string
+	serveTarget           string
+	serveIgnore           []string
+	serveMapRemote        []string
+	serveRewriteBody      []string
+	serveNoStore          bool
+	serveMaxBodySize      int64
 )
 
 var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Start the proxy server",
-	Long:  "Start the HTTP/HTTPS proxy. Every request is captured and saved to the store directory. Use --bind 0.0.0.0 to accept connections from other machines. Use --max-captures to limit stored captures (oldest pruned).",
+	Long:  "Start the HTTP/HTTPS proxy. In forward mode (default) point HTTP_PROXY/HTTPS_PROXY at it. In reverse mode use --target to proxy a backend directly.",
 	RunE:  runServe,
 }
 
@@ -53,17 +62,24 @@ func init() {
 	serveCmd.Flags().StringVarP(&servePort, "port", "p", "8888", "Port to listen on (1-65535)")
 	serveCmd.Flags().StringVarP(&serveBind, "bind", "b", "127.0.0.1", "Address to bind (use 0.0.0.0 for all interfaces)")
 	serveCmd.Flags().BoolVar(&serveNoMITM, "no-mitm", false, "Disable HTTPS MITM; CONNECT is tunneled only")
-	serveCmd.Flags().StringVar(&serveStoreDir, "store-dir", "", "Directory to save each capture (default: SNARE_STORE or ~/.snare/captures)")
-	serveCmd.Flags().BoolVarP(&serveVerbose, "verbose", "v", false, "Enable debug logging (connection-level and verbose output)")
-	serveCmd.Flags().IntVar(&serveMaxCaptures, "max-captures", 1000, "Maximum number of captures to keep (oldest files pruned when exceeded)")
-	serveCmd.Flags().StringVar(&serveUpstreamProxy, "upstream-proxy", "", "Send outbound traffic through this proxy URL (http://host:port)")
-	serveCmd.Flags().StringArrayVar(&serveRewriteHost, "rewrite-host", nil, "Rewrite outbound host using from=to (repeatable)")
-	serveCmd.Flags().StringArrayVar(&serveAddHeader, "add-header", nil, "Add or override outbound header (Key: Value); repeatable")
-	serveCmd.Flags().StringArrayVar(&serveRemoveHeader, "remove-header", nil, "Remove outbound header by name; repeatable")
-	serveCmd.Flags().StringVar(&serveMockFile, "mock-file", "", "Load mock rules from this file (default: SNARE_MOCKS or ~/.snare/mocks.json)")
-	serveCmd.Flags().StringVar(&serveIntercept, "intercept", "", "Intercept requests whose URL matches this pattern (use * for all)")
-	serveCmd.Flags().DurationVar(&serveInterceptTimeout, "intercept-timeout", 5*time.Minute, "How long to wait for a decision before dropping the intercepted request")
-	serveCmd.Flags().StringVar(&serveOnCapture, "on-capture", "", "Run this shell command for each capture; the capture JSON is written to its stdin")
+	serveCmd.Flags().StringVar(&serveStoreDir, "store-dir", "", "Directory to save captures (default: SNARE_STORE or ~/.snare/captures)")
+	serveCmd.Flags().BoolVarP(&serveVerbose, "verbose", "v", false, "Enable debug logging")
+	serveCmd.Flags().IntVar(&serveMaxCaptures, "max-captures", 1000, "Maximum number of captures to keep; oldest pruned")
+	serveCmd.Flags().StringVar(&serveUpstreamProxy, "upstream-proxy", "", "Forward outbound traffic through this proxy URL (http://host:port)")
+	serveCmd.Flags().StringArrayVar(&serveRewriteHost, "rewrite-host", nil, "Rewrite outbound host: from=to (repeatable)")
+	serveCmd.Flags().StringArrayVar(&serveAddHeader, "add-header", nil, "Add or override outbound header: Key: Value (repeatable)")
+	serveCmd.Flags().StringArrayVar(&serveRemoveHeader, "remove-header", nil, "Remove outbound header by name (repeatable)")
+	serveCmd.Flags().StringVar(&serveMockFile, "mock-file", "", "Load mock rules from this file")
+	serveCmd.Flags().StringVar(&serveIntercept, "intercept", "", "Intercept requests matching this URL pattern (use * for all)")
+	serveCmd.Flags().DurationVar(&serveInterceptTimeout, "intercept-timeout", 5*time.Minute, "Auto-drop intercepted requests after this duration")
+	serveCmd.Flags().StringVar(&serveOnCapture, "on-capture", "", "Run this shell command for each new capture; capture JSON written to stdin")
+	serveCmd.Flags().StringVar(&serveMode, "mode", "forward", "Proxy mode: forward or reverse")
+	serveCmd.Flags().StringVar(&serveTarget, "target", "", "Reverse proxy target URL (required when --mode reverse)")
+	serveCmd.Flags().StringArrayVar(&serveIgnore, "ignore", nil, "Skip capturing requests whose URL contains this substring (repeatable)")
+	serveCmd.Flags().StringArrayVar(&serveMapRemote, "map-remote", nil, "Redirect host to a different base URL: source-host=http://target (repeatable)")
+	serveCmd.Flags().StringArrayVar(&serveRewriteBody, "rewrite-body", nil, "Rewrite response bodies: regex=replacement (repeatable)")
+	serveCmd.Flags().BoolVar(&serveNoStore, "no-store", false, "Disable disk persistence (captures held in memory only)")
+	serveCmd.Flags().Int64Var(&serveMaxBodySize, "max-body-size", 0, "Truncate captured bodies at this byte limit (0 = no limit)")
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
@@ -73,13 +89,33 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 	servePort = port
 
+	if serveMode != "forward" && serveMode != "reverse" {
+		return fmt.Errorf("--mode must be forward or reverse, got %q", serveMode)
+	}
+
+	var reverseTarget *url.URL
+	if serveMode == "reverse" {
+		if serveTarget == "" {
+			return fmt.Errorf("--target is required when --mode reverse")
+		}
+		reverseTarget, err = url.Parse(serveTarget)
+		if err != nil || reverseTarget.Host == "" {
+			return fmt.Errorf("invalid --target URL: %s", serveTarget)
+		}
+	}
+
 	storeDir := serveStoreDir
-	if storeDir == "" {
-		storeDir = config.StoreDir()
+	if !serveNoStore {
+		if storeDir == "" {
+			storeDir = config.StoreDir()
+		}
+		if err := os.MkdirAll(storeDir, 0700); err != nil {
+			return err
+		}
+	} else {
+		storeDir = ""
 	}
-	if err := os.MkdirAll(storeDir, 0700); err != nil {
-		return err
-	}
+
 	maxCap := serveMaxCaptures
 	if maxCap <= 0 {
 		maxCap = 1000
@@ -95,6 +131,16 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	removeHeaders := normalizeHeaderNames(serveRemoveHeader)
+
+	mapRemotes, err := parseMapRemoteRules(serveMapRemote)
+	if err != nil {
+		return err
+	}
+
+	bodyRewrites, err := parseBodyRewrites(serveRewriteBody)
+	if err != nil {
+		return err
+	}
 
 	mockFilePath := serveMockFile
 	if mockFilePath == "" {
@@ -119,11 +165,11 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 
 	var hostCerts *cert.HostCertCache
-	mitmEnable := !serveNoMITM
+	mitmEnable := !serveNoMITM && serveMode == "forward"
 	if mitmEnable {
-		ca, key, err := cert.LoadOrCreateCA(config.CADir())
-		if err != nil {
-			log.Warn("CA load failed, MITM disabled", "err", err)
+		ca, key, caErr := cert.LoadOrCreateCA(config.CADir())
+		if caErr != nil {
+			log.Warn("CA load failed, MITM disabled", "err", caErr)
 			mitmEnable = false
 		} else {
 			hostCerts = cert.NewHostCertCache(ca, key)
@@ -144,6 +190,12 @@ func runServe(cmd *cobra.Command, args []string) error {
 		AddHeaders:       addHeaders,
 		RemoveHeaders:    removeHeaders,
 		OnCapture:        buildOnCapture(serveOnCapture),
+		IgnorePatterns:   serveIgnore,
+		MapRemotes:       mapRemotes,
+		BodyRewrites:     bodyRewrites,
+		MaxBodySize:      serveMaxBodySize,
+		Mode:             serveMode,
+		ReverseTarget:    reverseTarget,
 	}
 
 	addr := serveBind + ":" + servePort
@@ -152,9 +204,15 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	log.Info("proxy listening", "addr", addr, "mitm", mitmEnable)
-	log.Info("intercepted requests saved to", "dir", storeDir)
-	log.Info("set HTTP_PROXY and HTTPS_PROXY to http://" + addr)
+	if serveMode == "reverse" {
+		log.Info("reverse proxy listening", "addr", addr, "target", serveTarget)
+	} else {
+		log.Info("proxy listening", "addr", addr, "mitm", mitmEnable)
+		log.Info("set HTTP_PROXY and HTTPS_PROXY to http://" + addr)
+	}
+	if storeDir != "" {
+		log.Info("captures saved to", "dir", storeDir)
+	}
 	if serveBind == "0.0.0.0" {
 		for _, ip := range localIPs() {
 			log.Info("external clients can use", "url", "http://"+ip+":"+servePort)
@@ -232,6 +290,45 @@ func parseHeaderPairs(items []string) ([]proxy.HeaderValue, error) {
 			return nil, fmt.Errorf("invalid --add-header value %q (missing header name)", item)
 		}
 		out = append(out, proxy.HeaderValue{Key: key, Value: val})
+	}
+	return out, nil
+}
+
+func parseMapRemoteRules(items []string) ([]proxy.MapRemoteRule, error) {
+	out := make([]proxy.MapRemoteRule, 0, len(items))
+	for _, item := range items {
+		parts := strings.SplitN(item, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid --map-remote value %q (expected source-host=http://target)", item)
+		}
+		src := strings.TrimSpace(parts[0])
+		tgt := strings.TrimSpace(parts[1])
+		if src == "" || tgt == "" {
+			return nil, fmt.Errorf("invalid --map-remote value %q", item)
+		}
+		u, err := url.Parse(tgt)
+		if err != nil || u.Host == "" {
+			return nil, fmt.Errorf("invalid --map-remote target URL %q: %v", tgt, err)
+		}
+		out = append(out, proxy.MapRemoteRule{SourceHost: src, TargetBase: u})
+	}
+	return out, nil
+}
+
+func parseBodyRewrites(items []string) ([]proxy.BodyRewrite, error) {
+	out := make([]proxy.BodyRewrite, 0, len(items))
+	for _, item := range items {
+		idx := strings.Index(item, "=")
+		if idx < 1 {
+			return nil, fmt.Errorf("invalid --rewrite-body value %q (expected regex=replacement)", item)
+		}
+		pattern := item[:idx]
+		replacement := item[idx+1:]
+		re, err := regexp.Compile(pattern)
+		if err != nil {
+			return nil, fmt.Errorf("invalid --rewrite-body pattern %q: %v", pattern, err)
+		}
+		out = append(out, proxy.BodyRewrite{Pattern: re, Replacement: []byte(replacement)})
 	}
 	return out, nil
 }

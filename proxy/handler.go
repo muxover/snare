@@ -4,20 +4,22 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/tls"
-	"github.com/muxover/snare/capture"
-	"github.com/muxover/snare/intercept"
-	"github.com/muxover/snare/mock"
-	"github.com/muxover/snare/proxy/cert"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/muxover/snare/capture"
+	"github.com/muxover/snare/intercept"
+	"github.com/muxover/snare/mock"
+	"github.com/muxover/snare/proxy/cert"
 )
 
 type Handler struct {
@@ -34,6 +36,12 @@ type Handler struct {
 	AddHeaders       []HeaderValue
 	RemoveHeaders    []string
 	OnCapture        func(*capture.Capture)
+	IgnorePatterns   []string
+	MapRemotes       []MapRemoteRule
+	BodyRewrites     []BodyRewrite
+	MaxBodySize      int64
+	Mode             string
+	ReverseTarget    *url.URL
 }
 
 type HostRewrite struct {
@@ -46,11 +54,46 @@ type HeaderValue struct {
 	Value string
 }
 
+type MapRemoteRule struct {
+	SourceHost string
+	TargetBase *url.URL
+}
+
+type BodyRewrite struct {
+	Pattern     *regexp.Regexp
+	Replacement []byte
+}
+
 func (h *Handler) addCapture(c *capture.Capture) {
-	h.Store.Add(c)
+	if h.Store != nil {
+		h.Store.Add(c)
+	}
 	if h.OnCapture != nil {
 		go h.OnCapture(c)
 	}
+}
+
+func (h *Handler) isIgnored(urlStr string) bool {
+	for _, p := range h.IgnorePatterns {
+		if strings.Contains(urlStr, p) {
+			return true
+		}
+	}
+	return false
+}
+
+func (h *Handler) applyBodyRewrites(body []byte) []byte {
+	for _, rw := range h.BodyRewrites {
+		body = rw.Pattern.ReplaceAll(body, rw.Replacement)
+	}
+	return body
+}
+
+func (h *Handler) capSlice(b []byte) []byte {
+	if h.MaxBodySize > 0 && int64(len(b)) > h.MaxBodySize {
+		return b[:h.MaxBodySize]
+	}
+	return b
 }
 
 func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -62,6 +105,15 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}()
 
 	h.Log.Info("request", "method", req.Method, "host", req.Host, "path", req.URL.Path, "remote", req.RemoteAddr)
+
+	if h.Mode == "reverse" {
+		if req.Method == http.MethodConnect {
+			http.Error(rw, "CONNECT not supported in reverse proxy mode", http.StatusMethodNotAllowed)
+			return
+		}
+		h.serveReverse(rw, req)
+		return
+	}
 
 	if req.Method == http.MethodConnect {
 		h.serveCONNECT(rw, req)
@@ -81,11 +133,8 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 	start := time.Now()
 	capID := uuid.New().String()
 
-	var bodyBuf []byte
-	if req.Body != nil {
-		bodyBuf, _ = io.ReadAll(req.Body)
-		req.Body = io.NopCloser(bytes.NewReader(bodyBuf))
-	}
+	bodyBuf, _ := io.ReadAll(req.Body)
+	req.Body = io.NopCloser(bytes.NewReader(bodyBuf))
 
 	u := req.URL
 	if u.Scheme == "" {
@@ -95,7 +144,9 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 		u.Host = req.Host
 	}
 
-	if h.Intercept != nil && intercept.MatchesPattern(req, h.InterceptMatch) {
+	ignored := h.isIgnored(u.String())
+
+	if !ignored && h.Intercept != nil && intercept.MatchesPattern(req, h.InterceptMatch) {
 		newBody, dropped := h.holdAndApply(req, capID, start, u.String(), bodyBuf)
 		if dropped {
 			http.Error(rw, "request dropped by intercept", http.StatusBadGateway)
@@ -114,13 +165,17 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 	outReq.Host = req.Host
 	h.applyOutboundMods(outReq)
 
-	if isWebSocketUpgrade(outReq) && h.tryServeHTTPWebSocket(rw, outReq, capID, start, bodyBuf) {
+	if !ignored && isWebSocketUpgrade(outReq) && h.tryServeHTTPWebSocket(rw, outReq, capID, start, bodyBuf) {
 		return
 	}
 
 	resp, err := h.Transport.RoundTrip(outReq)
 	duration := time.Since(start)
 	if err != nil {
+		if ignored {
+			http.Error(rw, err.Error(), http.StatusBadGateway)
+			return
+		}
 		reqCaptureBody := decompressBody(bodyBuf, req.Header.Get("Content-Encoding"))
 		reqHeaders := req.Header.Clone()
 		if len(reqCaptureBody) != len(bodyBuf) {
@@ -141,13 +196,15 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 			Error:    err.Error(),
 		})
 		h.Log.Info("captured (error)", "method", req.Method, "url", req.URL.String(), "err", err)
-		h.Log.Error("roundtrip", "err", err)
 		http.Error(rw, err.Error(), http.StatusBadGateway)
 		return
 	}
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(resp.Body)
+	if len(h.BodyRewrites) > 0 {
+		respBody = h.applyBodyRewrites(respBody)
+	}
 	captureBody := decompressBody(respBody, resp.Header.Get("Content-Encoding"))
 	respHeaders := resp.Header.Clone()
 	if len(captureBody) != len(respBody) {
@@ -160,25 +217,120 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 		reqHeaders.Del("Content-Encoding")
 		reqHeaders.Set("Content-Length", strconv.Itoa(len(reqCaptureBody)))
 	}
-	c := &capture.Capture{
-		ID:        capID,
-		Timestamp: start,
-		Protocol:  "h1",
-		Request: capture.RequestSnapshot{
-			Method:  req.Method,
-			URL:     outReq.URL.String(),
-			Headers: reqHeaders,
-			Body:    capture.BodyBytes(reqCaptureBody),
-		},
-		Response: &capture.ResponseSnapshot{
-			StatusCode: resp.StatusCode,
-			Headers:    respHeaders,
-			Body:       capture.BodyBytes(captureBody),
-		},
-		Duration: duration,
+
+	if !ignored {
+		c := &capture.Capture{
+			ID:        capID,
+			Timestamp: start,
+			Protocol:  "h1",
+			Request: capture.RequestSnapshot{
+				Method:  req.Method,
+				URL:     outReq.URL.String(),
+				Headers: reqHeaders,
+				Body:    capture.BodyBytes(h.capSlice(reqCaptureBody)),
+			},
+			Response: &capture.ResponseSnapshot{
+				StatusCode: resp.StatusCode,
+				Headers:    respHeaders,
+				Body:       capture.BodyBytes(h.capSlice(captureBody)),
+			},
+			Duration: duration,
+		}
+		h.addCapture(c)
+		h.Log.Info("captured", "method", req.Method, "url", outReq.URL.String(), "status", resp.StatusCode, "id", capID[:8])
 	}
-	h.addCapture(c)
-	h.Log.Info("captured", "method", req.Method, "url", outReq.URL.String(), "status", resp.StatusCode, "id", capID[:8])
+
+	for k, v := range resp.Header {
+		for _, vv := range v {
+			rw.Header().Add(k, vv)
+		}
+	}
+	rw.WriteHeader(resp.StatusCode)
+	_, _ = rw.Write(respBody)
+}
+
+func (h *Handler) serveReverse(rw http.ResponseWriter, req *http.Request) {
+	if h.Mocks != nil {
+		if rule := h.Mocks.Match(req); rule != nil {
+			h.serveMock(rw, req, rule)
+			return
+		}
+	}
+
+	start := time.Now()
+	capID := uuid.New().String()
+
+	bodyBuf, _ := io.ReadAll(req.Body)
+
+	outURL := *h.ReverseTarget
+	outURL.Path = req.URL.Path
+	outURL.RawQuery = req.URL.RawQuery
+
+	ignored := h.isIgnored(outURL.String())
+
+	if !ignored && h.Intercept != nil && intercept.MatchesPattern(req, h.InterceptMatch) {
+		newBody, dropped := h.holdAndApply(req, capID, start, outURL.String(), bodyBuf)
+		if dropped {
+			http.Error(rw, "request dropped by intercept", http.StatusBadGateway)
+			return
+		}
+		bodyBuf = newBody
+	}
+
+	outReq, err := http.NewRequest(req.Method, outURL.String(), bytes.NewReader(bodyBuf))
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+		return
+	}
+	outReq.Header = req.Header.Clone()
+	outReq.Host = h.ReverseTarget.Host
+	h.applyOutboundMods(outReq)
+
+	resp, err := h.Transport.RoundTrip(outReq)
+	duration := time.Since(start)
+	if err != nil {
+		if !ignored {
+			h.addCapture(&capture.Capture{ID: capID, Timestamp: start, Protocol: "h1",
+				Request:  capture.RequestSnapshot{Method: req.Method, URL: outURL.String(), Headers: req.Header.Clone()},
+				Duration: duration, Error: err.Error(),
+			})
+		}
+		http.Error(rw, err.Error(), http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	if len(h.BodyRewrites) > 0 {
+		respBody = h.applyBodyRewrites(respBody)
+	}
+	captureBody := decompressBody(respBody, resp.Header.Get("Content-Encoding"))
+	respHeaders := resp.Header.Clone()
+	if len(captureBody) != len(respBody) {
+		respHeaders.Del("Content-Encoding")
+		respHeaders.Set("Content-Length", strconv.Itoa(len(captureBody)))
+	}
+
+	if !ignored {
+		h.addCapture(&capture.Capture{
+			ID:        capID,
+			Timestamp: start,
+			Protocol:  "h1",
+			Request: capture.RequestSnapshot{
+				Method:  req.Method,
+				URL:     outURL.String(),
+				Headers: req.Header.Clone(),
+				Body:    capture.BodyBytes(h.capSlice(decompressBody(bodyBuf, req.Header.Get("Content-Encoding")))),
+			},
+			Response: &capture.ResponseSnapshot{
+				StatusCode: resp.StatusCode,
+				Headers:    respHeaders,
+				Body:       capture.BodyBytes(h.capSlice(captureBody)),
+			},
+			Duration: duration,
+		})
+		h.Log.Info("captured", "method", req.Method, "url", outURL.String(), "status", resp.StatusCode, "id", capID[:8])
+	}
 
 	for k, v := range resp.Header {
 		for _, vv := range v {
@@ -255,7 +407,7 @@ func (h *Handler) tryServeHTTPWebSocket(rw http.ResponseWriter, outReq *http.Req
 	c := &capture.Capture{
 		ID:        capID,
 		Timestamp: start,
-		Protocol:  "h1",
+		Protocol:  "ws",
 		Request: capture.RequestSnapshot{
 			Method:  outReq.Method,
 			URL:     outReq.URL.String(),
@@ -296,6 +448,10 @@ func (h *Handler) tryServeHTTPWebSocket(rw http.ResponseWriter, outReq *http.Req
 }
 
 func (h *Handler) serveCONNECT(rw http.ResponseWriter, req *http.Request) {
+	if h.isIgnored(req.Host) {
+		h.tunnelCONNECT(rw, req)
+		return
+	}
 	if !h.MitmEnable || h.HostCerts == nil {
 		h.tunnelCONNECT(rw, req)
 		return
@@ -398,7 +554,9 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 		req.URL.Host = hostname
 		h.applyOutboundMods(req)
 
-		if h.Mocks != nil {
+		ignored := h.isIgnored(req.URL.String())
+
+		if !ignored && h.Mocks != nil {
 			if rule := h.Mocks.Match(req); rule != nil {
 				if writeMockH1(clientConn, req, rule, h.Log) {
 					continue
@@ -411,7 +569,7 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 		bodyBuf, _ := io.ReadAll(req.Body)
 		req.Body = io.NopCloser(bytes.NewReader(bodyBuf))
 
-		if h.Intercept != nil && intercept.MatchesPattern(req, h.InterceptMatch) {
+		if !ignored && h.Intercept != nil && intercept.MatchesPattern(req, h.InterceptMatch) {
 			newBody, dropped := h.holdAndApply(req, capID, start, req.URL.String(), bodyBuf)
 			if dropped {
 				_ = writeDropH1(clientConn)
@@ -423,7 +581,9 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 
 		reqBytes, _ := httputil.DumpRequest(req, false)
 		if _, err := originConn.Write(reqBytes); err != nil {
-			h.addCapture(&capture.Capture{ID: capID, Timestamp: start, Error: err.Error()})
+			if !ignored {
+				h.addCapture(&capture.Capture{ID: capID, Timestamp: start, Error: err.Error()})
+			}
 			return
 		}
 		if len(bodyBuf) > 0 {
@@ -432,53 +592,65 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 
 		resp, err := http.ReadResponse(originReader, req)
 		if err != nil {
-			h.addCapture(&capture.Capture{ID: capID, Timestamp: start, Error: err.Error()})
+			if !ignored {
+				h.addCapture(&capture.Capture{ID: capID, Timestamp: start, Error: err.Error()})
+			}
 			return
 		}
 		respBody, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		duration := time.Since(start)
 
-		reqCaptureBody := decompressBody(bodyBuf, req.Header.Get("Content-Encoding"))
-		reqHeaders := req.Header.Clone()
-		if len(reqCaptureBody) != len(bodyBuf) {
-			reqHeaders.Del("Content-Encoding")
-			reqHeaders.Set("Content-Length", strconv.Itoa(len(reqCaptureBody)))
+		if len(h.BodyRewrites) > 0 {
+			respBody = h.applyBodyRewrites(respBody)
 		}
-		captureBody := decompressBody(respBody, resp.Header.Get("Content-Encoding"))
-		respHeaders := resp.Header.Clone()
-		if len(captureBody) != len(respBody) {
-			respHeaders.Del("Content-Encoding")
-			respHeaders.Set("Content-Length", strconv.Itoa(len(captureBody)))
+
+		if !ignored {
+			reqCaptureBody := decompressBody(bodyBuf, req.Header.Get("Content-Encoding"))
+			reqHeaders := req.Header.Clone()
+			if len(reqCaptureBody) != len(bodyBuf) {
+				reqHeaders.Del("Content-Encoding")
+				reqHeaders.Set("Content-Length", strconv.Itoa(len(reqCaptureBody)))
+			}
+			captureBody := decompressBody(respBody, resp.Header.Get("Content-Encoding"))
+			respHeaders := resp.Header.Clone()
+			if len(captureBody) != len(respBody) {
+				respHeaders.Del("Content-Encoding")
+				respHeaders.Set("Content-Length", strconv.Itoa(len(captureBody)))
+			}
+			proto := "h1"
+			if isWebSocketUpgrade(req) && isWebSocketAcceptResponse(resp) {
+				proto = "ws"
+			}
+			c := &capture.Capture{
+				ID:        capID,
+				Timestamp: start,
+				Protocol:  proto,
+				Request: capture.RequestSnapshot{
+					Method:  req.Method,
+					URL:     req.URL.String(),
+					Headers: reqHeaders,
+					Body:    capture.BodyBytes(h.capSlice(reqCaptureBody)),
+				},
+				Response: &capture.ResponseSnapshot{
+					StatusCode: resp.StatusCode,
+					Headers:    respHeaders,
+					Body:       capture.BodyBytes(h.capSlice(captureBody)),
+				},
+				Duration: duration,
+			}
+			if proto == "ws" {
+				h.Log.Info("websocket", "url", req.URL.String(), "id", capID[:8])
+				resp.Body = io.NopCloser(bytes.NewReader(respBody))
+				respBytes := bytes.NewBuffer(nil)
+				_ = resp.Write(respBytes)
+				_, _ = clientConn.Write(respBytes.Bytes())
+				h.relayWebSocketCapture(c, clientReader, clientConn, originReader, originConn)
+				return
+			}
+			h.addCapture(c)
+			h.Log.Info("captured", "method", req.Method, "url", req.URL.String(), "status", resp.StatusCode, "id", capID[:8])
 		}
-		c := &capture.Capture{
-			ID:        capID,
-			Timestamp: start,
-			Protocol:  "h1",
-			Request: capture.RequestSnapshot{
-				Method:  req.Method,
-				URL:     req.URL.String(),
-				Headers: reqHeaders,
-				Body:    capture.BodyBytes(reqCaptureBody),
-			},
-			Response: &capture.ResponseSnapshot{
-				StatusCode: resp.StatusCode,
-				Headers:    respHeaders,
-				Body:       capture.BodyBytes(captureBody),
-			},
-			Duration: duration,
-		}
-		if isWebSocketUpgrade(req) && isWebSocketAcceptResponse(resp) {
-			h.Log.Info("websocket", "url", req.URL.String(), "id", capID[:8])
-			resp.Body = io.NopCloser(bytes.NewReader(respBody))
-			respBytes := bytes.NewBuffer(nil)
-			_ = resp.Write(respBytes)
-			_, _ = clientConn.Write(respBytes.Bytes())
-			h.relayWebSocketCapture(c, clientReader, clientConn, originReader, originConn)
-			return
-		}
-		h.addCapture(c)
-		h.Log.Info("captured", "method", req.Method, "url", req.URL.String(), "status", resp.StatusCode, "id", capID[:8])
 
 		resp.Body = io.NopCloser(bytes.NewReader(respBody))
 		respBytes := bytes.NewBuffer(nil)
@@ -487,7 +659,7 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 	}
 }
 
-func (h *Handler) holdAndApply(req *http.Request, id string, ts time.Time, url string, body []byte) ([]byte, bool) {
+func (h *Handler) holdAndApply(req *http.Request, id string, ts time.Time, rawURL string, body []byte) ([]byte, bool) {
 	timeout := h.InterceptTimeout
 	if timeout <= 0 {
 		timeout = 5 * time.Minute
@@ -496,7 +668,7 @@ func (h *Handler) holdAndApply(req *http.Request, id string, ts time.Time, url s
 		ID:        id,
 		Timestamp: ts,
 		Method:    req.Method,
-		URL:       url,
+		URL:       rawURL,
 		Headers:   req.Header.Clone(),
 		Body:      string(body),
 	}
@@ -504,7 +676,7 @@ func (h *Handler) holdAndApply(req *http.Request, id string, ts time.Time, url s
 		h.Log.Error("intercept enqueue", "err", err)
 		return body, false
 	}
-	h.Log.Info("intercepted — waiting for decision", "id", id[:8], "method", req.Method, "url", url)
+	h.Log.Info("intercepted — waiting for decision", "id", id[:8], "method", req.Method, "url", rawURL)
 	decided, err := h.Intercept.WaitDecision(id, timeout)
 	_ = h.Intercept.Remove(id)
 	if err != nil {
@@ -528,8 +700,7 @@ func (h *Handler) holdAndApply(req *http.Request, id string, ts time.Time, url s
 }
 
 func writeDropH1(conn net.Conn) error {
-	resp := "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-	_, err := conn.Write([]byte(resp))
+	_, err := conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"))
 	return err
 }
 
@@ -587,6 +758,7 @@ func (h *Handler) serveMock(rw http.ResponseWriter, req *http.Request, rule *moc
 
 func (h *Handler) applyOutboundMods(req *http.Request) {
 	h.applyHostRewrite(req)
+	h.applyMapRemote(req)
 	for _, key := range h.RemoveHeaders {
 		req.Header.Del(key)
 	}
@@ -612,5 +784,21 @@ func (h *Handler) applyHostRewrite(req *http.Request) {
 		req.URL.Host = targetHost
 		req.Host = targetHost
 		return
+	}
+}
+
+func (h *Handler) applyMapRemote(req *http.Request) {
+	if req.URL == nil || len(h.MapRemotes) == 0 {
+		return
+	}
+	for _, rule := range h.MapRemotes {
+		if strings.EqualFold(req.URL.Hostname(), rule.SourceHost) {
+			newURL := *rule.TargetBase
+			newURL.Path = req.URL.Path
+			newURL.RawQuery = req.URL.RawQuery
+			req.URL = &newURL
+			req.Host = rule.TargetBase.Host
+			return
+		}
 	}
 }

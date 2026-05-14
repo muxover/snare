@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-05-14
+
+### Added
+
+- `snare serve --mode reverse --target <url>` — reverse proxy mode; Snare sits in front of a backend and captures all traffic without requiring `HTTP_PROXY` to be set.
+- `snare serve --rewrite-body <regex=replacement>` — rewrite response bodies with a regular expression before capturing and forwarding.
+- `snare serve --ignore <substring>` — skip capturing requests whose URL contains this substring; applied at the CONNECT (host) and per-request levels. Repeatable.
+- `snare serve --map-remote <host=http://target>` — redirect outbound requests for a given host to a different base URL. Repeatable.
+- `snare serve --no-store` — disable disk persistence; captures are held in memory only and not written to `SNARE_STORE`.
+- `snare serve --max-body-size <bytes>` — truncate captured request and response bodies at this byte limit (0 = no limit).
+- `snare grep <pattern>` — regex search across request and response bodies in all captures; supports `--invert`, `--method`, `--host`.
+- `snare replay --edit` — open the capture JSON in `$EDITOR` before resending; edited method, URL, headers, and body are used for the request.
+- `snare clear --method/--status/--url/--host` — selective delete; without filters clears all captures (previous behaviour).
+- `snare watch --method/--status/--url/--host/--body` — same filters as `snare list`, applied per poll tick.
+- `snare ca install` now executes the system trust-store command directly (`certutil` on Windows, `security` on macOS, `update-ca-certificates` on Linux) instead of just printing instructions.
+- Protocol column in `snare list` and `snare watch` output: `h1`, `h2`, or `ws`, coloured with lipgloss.
+- Colourised status codes in `snare list` and `snare watch`: 2xx green, 3xx yellow, 4xx red, 5xx magenta.
+- WebSocket frame list in `snare tui` detail view — rendered after the response section with per-frame direction arrow, timestamp, opcode, and payload preview.
+
 ## [1.7.0] - 2026-05-13
 
 ### Added
