@@ -4,7 +4,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -19,13 +21,13 @@ var exportLast int
 
 var exportCmd = &cobra.Command{
 	Use:   "export",
-	Short: "Export captures to HAR or JSON",
-	Long:  "Export the last N captures to a single file. Format: json (default) or har. Output: export.json or export.har.",
+	Short: "Export captures to HAR, JSON, or Postman collection",
+	Long:  "Export the last N captures to a single file. Format: json (default), har, or postman.",
 	RunE:  runExport,
 }
 
 func init() {
-	exportCmd.Flags().StringVarP(&exportFormat, "format", "f", "json", "Format: json or har")
+	exportCmd.Flags().StringVarP(&exportFormat, "format", "f", "json", "Format: json, har, or postman")
 	exportCmd.Flags().IntVarP(&exportLast, "last", "n", 50, "")
 }
 
@@ -36,20 +38,31 @@ func runExport(cmd *cobra.Command, args []string) error {
 		fmt.Println("No captures to export.")
 		return nil
 	}
-	out := "export." + exportFormat
-	if exportFormat == "har" {
+	switch exportFormat {
+	case "har":
+		out := "export.har"
 		har := buildHAR(captures)
 		data, err := json.MarshalIndent(har, "", "  ")
 		if err != nil {
 			return err
 		}
 		return os.WriteFile(out, data, 0644)
+	case "postman":
+		out := "export.postman_collection.json"
+		col := buildPostman(captures)
+		data, err := json.MarshalIndent(col, "", "  ")
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(out, data, 0644)
+	default:
+		out := "export.json"
+		data, err := json.MarshalIndent(captures, "", "  ")
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(out, data, 0644)
 	}
-	data, err := json.MarshalIndent(captures, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(out, data, 0644)
 }
 
 func buildHAR(captures []*capture.Capture) map[string]interface{} {
@@ -121,4 +134,69 @@ func harWSDataString(b []byte) string {
 		return string(b)
 	}
 	return base64.StdEncoding.EncodeToString(b)
+}
+
+func buildPostman(captures []*capture.Capture) map[string]interface{} {
+	items := make([]map[string]interface{}, 0, len(captures))
+	for _, c := range captures {
+		u, err := url.Parse(c.Request.URL)
+		if err != nil {
+			continue
+		}
+		pathParts := strings.Split(strings.TrimPrefix(u.Path, "/"), "/")
+
+		rawURL := map[string]interface{}{
+			"raw":      c.Request.URL,
+			"protocol": u.Scheme,
+			"host":     strings.Split(u.Host, "."),
+			"path":     pathParts,
+		}
+		if u.RawQuery != "" {
+			var qparams []map[string]string
+			for k, vals := range u.Query() {
+				for _, v := range vals {
+					qparams = append(qparams, map[string]string{"key": k, "value": v})
+				}
+			}
+			rawURL["query"] = qparams
+		}
+
+		var headers []map[string]string
+		for k, vals := range c.Request.Headers {
+			for _, v := range vals {
+				headers = append(headers, map[string]string{"key": k, "value": v})
+			}
+		}
+
+		request := map[string]interface{}{
+			"method": c.Request.Method,
+			"url":    rawURL,
+			"header": headers,
+		}
+		if len(c.Request.Body) > 0 {
+			ct := c.Request.Headers.Get("Content-Type")
+			mode := "raw"
+			if strings.Contains(ct, "form") {
+				mode = "urlencoded"
+			}
+			request["body"] = map[string]interface{}{
+				"mode": mode,
+				"raw":  string(c.Request.Body),
+			}
+		}
+
+		name := c.Request.Method + " " + u.Path
+		items = append(items, map[string]interface{}{
+			"name":    name,
+			"request": request,
+		})
+	}
+
+	return map[string]interface{}{
+		"info": map[string]interface{}{
+			"name":   "snare export",
+			"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		},
+		"item": items,
+	}
 }

@@ -49,6 +49,9 @@ var (
 	serveRewriteBody      []string
 	serveNoStore          bool
 	serveMaxBodySize      int64
+	serveDelay            time.Duration
+	serveChaos            float64
+	serveBrowser          bool
 )
 
 var serveCmd = &cobra.Command{
@@ -80,6 +83,9 @@ func init() {
 	serveCmd.Flags().StringArrayVar(&serveRewriteBody, "rewrite-body", nil, "Rewrite response bodies: regex=replacement (repeatable)")
 	serveCmd.Flags().BoolVar(&serveNoStore, "no-store", false, "Disable disk persistence (captures held in memory only)")
 	serveCmd.Flags().Int64Var(&serveMaxBodySize, "max-body-size", 0, "Truncate captured bodies at this byte limit (0 = no limit)")
+	serveCmd.Flags().DurationVar(&serveDelay, "delay", 0, "Add artificial latency to every response (e.g. 200ms, 1s)")
+	serveCmd.Flags().Float64Var(&serveChaos, "chaos", 0, "Randomly drop this percentage of requests (0-100)")
+	serveCmd.Flags().BoolVar(&serveBrowser, "browser", false, "Launch system browser with proxy pre-configured after start")
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
@@ -196,6 +202,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 		MaxBodySize:      serveMaxBodySize,
 		Mode:             serveMode,
 		ReverseTarget:    reverseTarget,
+		Delay:            serveDelay,
+		ChaosRate:        serveChaos,
 	}
 
 	addr := serveBind + ":" + servePort
@@ -219,6 +227,10 @@ func runServe(cmd *cobra.Command, args []string) error {
 		}
 	}
 	srv.Start()
+
+	if serveBrowser {
+		go openBrowser("http://"+addr, log)
+	}
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -354,6 +366,40 @@ func buildOnCapture(cmd string) func(*capture.Capture) {
 		proc.Stderr = os.Stderr
 		_ = proc.Run()
 	}
+}
+
+func openBrowser(proxyAddr string, log *slog.Logger) {
+	time.Sleep(300 * time.Millisecond)
+	proxyFlag := "--proxy-server=" + proxyAddr
+	var candidates [][]string
+	switch runtime.GOOS {
+	case "windows":
+		candidates = [][]string{
+			{"cmd", "/C", "start", "chrome", proxyFlag, "about:blank"},
+			{"cmd", "/C", "start", "msedge", proxyFlag, "about:blank"},
+		}
+	case "darwin":
+		candidates = [][]string{
+			{"open", "-a", "Google Chrome", "--args", proxyFlag},
+			{"open", "-a", "Microsoft Edge", "--args", proxyFlag},
+			{"open", "-a", "Chromium", "--args", proxyFlag},
+		}
+	default:
+		candidates = [][]string{
+			{"google-chrome", proxyFlag},
+			{"chromium-browser", proxyFlag},
+			{"chromium", proxyFlag},
+			{"microsoft-edge", proxyFlag},
+		}
+	}
+	for _, args := range candidates {
+		cmd := exec.Command(args[0], args[1:]...)
+		if cmd.Start() == nil {
+			log.Info("browser launched with proxy", "proxy", proxyAddr)
+			return
+		}
+	}
+	log.Warn("could not find a supported browser; set proxy manually", "proxy", proxyAddr)
 }
 
 func normalizeHeaderNames(items []string) []string {

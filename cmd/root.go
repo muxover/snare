@@ -4,7 +4,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const Version = "1.8.0"
+const Version = "1.9.0"
 
 var rootCmd = &cobra.Command{
 	Use:   "snare",
@@ -38,4 +38,8 @@ func init() {
 	rootCmd.AddCommand(deleteCmd)
 	rootCmd.AddCommand(caCmd)
 	rootCmd.AddCommand(grepCmd)
+	rootCmd.AddCommand(curlCmd)
+	rootCmd.AddCommand(recordCmd)
+	rootCmd.AddCommand(playbackCmd)
+	rootCmd.AddCommand(openapiCmd)
 }

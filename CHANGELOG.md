@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-05-15
+
+### Added
+
+- `snare serve --delay <duration>` — inject artificial latency before every response; useful for simulating slow networks.
+- `snare serve --chaos <pct>` — randomly drop a percentage of requests with 503; useful for resilience testing.
+- `snare serve --browser` — auto-launch Chrome, Edge, or Chromium with `--proxy-server=` pointing at the running Snare proxy.
+- `snare ca install --device android` — push CA certificate to a connected Android device via ADB and install it in the user trust store.
+- `snare ca install --device ios` — serve CA certificate over a temporary local HTTP server so Safari can download and install it directly.
+- `snare curl <id>` — print a capture as a ready-to-run `curl` command with all headers and body included.
+- `snare export --format postman` — export captures as a Postman Collection v2.1.0 JSON file.
+- `snare openapi` — analyse captures and generate an OpenAPI 3.0.3 JSON spec; numeric and UUID path segments are parameterised as `{id}` automatically.
+- `snare record` — start the proxy and write all captures to a cassette file (NDJSON) for offline playback.
+- `snare playback <cassette>` — replay a cassette file: serves an HTTP server that matches requests by method and path and returns the recorded responses.
+
 ## [1.8.0] - 2026-05-14
 
 ### Added
@@ -114,7 +129,9 @@ First release.
 - Body decompression (gzip, deflate, brotli) for readable captures.
 - Config via `SNARE_STORE`, `SNARE_CA` and serve flags (port, bind, max-captures).
 
-[Unreleased]: https://github.com/muxover/snare/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/muxover/snare/compare/v1.9.0...HEAD
+[1.9.0]: https://github.com/muxover/snare/releases/tag/v1.9.0
+[1.8.0]: https://github.com/muxover/snare/releases/tag/v1.8.0
 [1.7.0]: https://github.com/muxover/snare/releases/tag/v1.7.0
 [1.6.0]: https://github.com/muxover/snare/releases/tag/v1.6.0
 [1.5.0]: https://github.com/muxover/snare/releases/tag/v1.5.0

@@ -5,7 +5,7 @@
 [![CI](https://github.com/muxover/snare/actions/workflows/ci.yml/badge.svg)](https://github.com/muxover/snare/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**HTTP/HTTPS proxy CLI — capture, inspect, and replay traffic from your terminal.**
+**Capture, inspect, and replay HTTP/HTTPS traffic from your terminal.**
 
 </div>
 
@@ -107,7 +107,21 @@ No proxy env vars needed. All traffic to `127.0.0.1:8888` is forwarded to the ta
 |---------|-------------|
 | `snare import <file.har>` | Import a HAR file |
 | `snare save <id>` | Save a capture to a file |
-| `snare export` | Export captures to JSON or HAR |
+| `snare export` | Export captures to JSON, HAR, or Postman collection |
+| `snare curl <id>` | Print a capture as a `curl` command |
+
+**OpenAPI**
+
+| Command | Description |
+|---------|-------------|
+| `snare openapi` | Generate an OpenAPI 3.0 spec from captured traffic |
+
+**Record / Playback**
+
+| Command | Description |
+|---------|-------------|
+| `snare record` | Record traffic to a cassette file for offline playback |
+| `snare playback <cassette>` | Replay a cassette file as an HTTP server |
 
 **Automation**
 
@@ -123,6 +137,8 @@ No proxy env vars needed. All traffic to `127.0.0.1:8888` is forwarded to the ta
 |---------|-------------|
 | `snare ca generate` | Generate CA certificate |
 | `snare ca install` | Install CA into system trust store |
+| `snare ca install --device android` | Push CA to Android device via ADB |
+| `snare ca install --device ios` | Serve CA for Safari download on iOS |
 
 ## serve Flags
 
@@ -147,6 +163,9 @@ No proxy env vars needed. All traffic to `127.0.0.1:8888` is forwarded to the ta
     --intercept         Pause requests matching this URL pattern (* for all)
     --intercept-timeout Auto-drop paused requests after this duration (default: 5m)
     --on-capture        Shell command run per capture; full JSON piped to stdin
+    --delay             Inject artificial latency before each response (e.g. 200ms)
+    --chaos             Drop this percentage of requests randomly (e.g. 10)
+    --browser           Auto-launch Chrome/Edge with proxy configured
 -v, --verbose           Debug logging
 ```
 
@@ -190,6 +209,40 @@ No proxy env vars needed. All traffic to `127.0.0.1:8888` is forwarded to the ta
 -v, --invert Print captures that do NOT match
 --method     Limit to this HTTP method
 --host       Limit to this host
+```
+
+## export Flags
+
+```
+-f, --format  Output format: json (default), har, postman
+-n, --last    Number of captures to export (default: 50)
+```
+
+## openapi Flags
+
+```
+-o, --out     Output file (default: openapi.json)
+    --title   API title (default: "snare captured API")
+    --server  Override server URL (default: inferred from captures)
+```
+
+## record Flags
+
+```
+-o, --out     Cassette output file (default: cassette.json)
+-p, --port    Port to listen on (default: 8888)
+-b, --bind    Bind address (default: 127.0.0.1)
+    --mode    forward (default) or reverse
+    --target  Reverse proxy target URL (required for --mode reverse)
+    --no-mitm Disable HTTPS MITM
+-v, --verbose Debug logging
+```
+
+## playback Flags
+
+```
+-p, --port  Port to listen on (default: 8888)
+-b, --bind  Bind address (default: 127.0.0.1)
 ```
 
 ## Environment
@@ -238,6 +291,29 @@ snare serve --map-remote api.example.com=http://localhost:4000
 # Reverse proxy with body rewrite
 snare serve --mode reverse --target http://localhost:3000 \
   --rewrite-body 'staging.internal=production.example.com'
+
+# Simulate latency and random failures
+snare serve --delay 200ms --chaos 15
+
+# Launch browser with proxy pre-configured
+snare serve --browser
+
+# Print a capture as curl
+snare curl <id>
+
+# Export as Postman collection
+snare export --format postman
+
+# Generate OpenAPI spec from captured traffic
+snare openapi --out api.json
+
+# Record then replay offline
+snare record --out cassette.json
+snare playback cassette.json
+
+# Install CA on mobile
+snare ca install --device android
+snare ca install --device ios
 ```
 
 ## Contributing
@@ -253,6 +329,7 @@ Licensed under [MIT](LICENSE).
 - Repository: https://github.com/muxover/snare
 - Issues: https://github.com/muxover/snare/issues
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
+- Go Reference: https://pkg.go.dev/github.com/muxover/snare
 
 ---
 

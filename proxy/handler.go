@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"io"
 	"log/slog"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -42,6 +43,8 @@ type Handler struct {
 	MaxBodySize      int64
 	Mode             string
 	ReverseTarget    *url.URL
+	Delay            time.Duration
+	ChaosRate        float64
 }
 
 type HostRewrite struct {
@@ -89,6 +92,10 @@ func (h *Handler) applyBodyRewrites(body []byte) []byte {
 	return body
 }
 
+func (h *Handler) shouldChaos() bool {
+	return h.ChaosRate > 0 && rand.Float64()*100 < h.ChaosRate
+}
+
 func (h *Handler) capSlice(b []byte) []byte {
 	if h.MaxBodySize > 0 && int64(len(b)) > h.MaxBodySize {
 		return b[:h.MaxBodySize]
@@ -105,6 +112,12 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}()
 
 	h.Log.Info("request", "method", req.Method, "host", req.Host, "path", req.URL.Path, "remote", req.RemoteAddr)
+
+	if h.shouldChaos() {
+		h.Log.Info("chaos: dropping request", "method", req.Method, "host", req.Host)
+		http.Error(rw, "chaos: request dropped", http.StatusServiceUnavailable)
+		return
+	}
 
 	if h.Mode == "reverse" {
 		if req.Method == http.MethodConnect {
@@ -240,6 +253,9 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 		h.Log.Info("captured", "method", req.Method, "url", outReq.URL.String(), "status", resp.StatusCode, "id", capID[:8])
 	}
 
+	if h.Delay > 0 {
+		time.Sleep(h.Delay)
+	}
 	for k, v := range resp.Header {
 		for _, vv := range v {
 			rw.Header().Add(k, vv)
@@ -332,6 +348,9 @@ func (h *Handler) serveReverse(rw http.ResponseWriter, req *http.Request) {
 		h.Log.Info("captured", "method", req.Method, "url", outURL.String(), "status", resp.StatusCode, "id", capID[:8])
 	}
 
+	if h.Delay > 0 {
+		time.Sleep(h.Delay)
+	}
 	for k, v := range resp.Header {
 		for _, vv := range v {
 			rw.Header().Add(k, vv)
@@ -556,6 +575,12 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 
 		ignored := h.isIgnored(req.URL.String())
 
+		if !ignored && h.shouldChaos() {
+			h.Log.Info("chaos: dropping request", "url", req.URL.String())
+			_ = writeDropH1(clientConn)
+			continue
+		}
+
 		if !ignored && h.Mocks != nil {
 			if rule := h.Mocks.Match(req); rule != nil {
 				if writeMockH1(clientConn, req, rule, h.Log) {
@@ -652,6 +677,9 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 			h.Log.Info("captured", "method", req.Method, "url", req.URL.String(), "status", resp.StatusCode, "id", capID[:8])
 		}
 
+		if h.Delay > 0 {
+			time.Sleep(h.Delay)
+		}
 		resp.Body = io.NopCloser(bytes.NewReader(respBody))
 		respBytes := bytes.NewBuffer(nil)
 		_ = resp.Write(respBytes)
