@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/tls"
+	"encoding/binary"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"math/rand"
@@ -11,7 +13,10 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
+	"os/exec"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -45,6 +50,8 @@ type Handler struct {
 	ReverseTarget    *url.URL
 	Delay            time.Duration
 	ChaosRate        float64
+	Shadows          []*url.URL
+	Plugins          []string
 }
 
 type HostRewrite struct {
@@ -74,6 +81,78 @@ func (h *Handler) addCapture(c *capture.Capture) {
 	if h.OnCapture != nil {
 		go h.OnCapture(c)
 	}
+	if len(h.Plugins) > 0 {
+		go h.runPlugins(c)
+	}
+}
+
+func (h *Handler) runPlugins(c *capture.Capture) {
+	data, err := json.Marshal(c)
+	if err != nil {
+		return
+	}
+	for _, pluginCmd := range h.Plugins {
+		go func(cmd string) {
+			var proc *exec.Cmd
+			if runtime.GOOS == "windows" {
+				proc = exec.Command("cmd", "/C", cmd)
+			} else {
+				proc = exec.Command("sh", "-c", cmd)
+			}
+			proc.Stdin = bytes.NewReader(data)
+			proc.Stderr = os.Stderr
+			_ = proc.Run()
+		}(pluginCmd)
+	}
+}
+
+func (h *Handler) fireShadows(method, rawURL string, header http.Header, body []byte) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return
+	}
+	for _, shadow := range h.Shadows {
+		target := *shadow
+		target.Path = u.Path
+		target.RawQuery = u.RawQuery
+		req, err := http.NewRequest(method, target.String(), bytes.NewReader(body))
+		if err != nil {
+			continue
+		}
+		req.Header = header.Clone()
+		resp, err := h.Transport.RoundTrip(req)
+		if err != nil {
+			h.Log.Debug("shadow failed", "url", target.String(), "err", err)
+			continue
+		}
+		_, _ = io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}
+}
+
+func isGRPC(h http.Header) bool {
+	return strings.HasPrefix(h.Get("Content-Type"), "application/grpc")
+}
+
+func parseGRPCFrames(body []byte, direction string) []capture.GRPCFrame {
+	var frames []capture.GRPCFrame
+	for len(body) >= 5 {
+		compressed := body[0] == 1
+		msgLen := binary.BigEndian.Uint32(body[1:5])
+		body = body[5:]
+		if uint32(len(body)) < msgLen {
+			break
+		}
+		payload := make([]byte, msgLen)
+		copy(payload, body[:msgLen])
+		frames = append(frames, capture.GRPCFrame{
+			Direction:  direction,
+			Compressed: compressed,
+			Data:       capture.BodyBytes(payload),
+		})
+		body = body[msgLen:]
+	}
+	return frames
 }
 
 func (h *Handler) isIgnored(urlStr string) bool {
@@ -249,8 +328,18 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 			},
 			Duration: duration,
 		}
+		if isGRPC(outReq.Header) || isGRPC(resp.Header) {
+			frames := append(parseGRPCFrames(reqCaptureBody, "request"), parseGRPCFrames(captureBody, "response")...)
+			if len(frames) > 0 {
+				c.GRPC = &capture.GRPCCapture{ServiceMethod: outReq.URL.Path, Frames: frames}
+			}
+		}
 		h.addCapture(c)
 		h.Log.Info("captured", "method", req.Method, "url", outReq.URL.String(), "status", resp.StatusCode, "id", capID[:8])
+	}
+
+	if len(h.Shadows) > 0 {
+		go h.fireShadows(req.Method, outReq.URL.String(), req.Header, bodyBuf)
 	}
 
 	if h.Delay > 0 {
@@ -346,6 +435,10 @@ func (h *Handler) serveReverse(rw http.ResponseWriter, req *http.Request) {
 			Duration: duration,
 		})
 		h.Log.Info("captured", "method", req.Method, "url", outURL.String(), "status", resp.StatusCode, "id", capID[:8])
+	}
+
+	if len(h.Shadows) > 0 {
+		go h.fireShadows(req.Method, outURL.String(), req.Header, bodyBuf)
 	}
 
 	if h.Delay > 0 {

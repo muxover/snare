@@ -6,6 +6,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-05-20
+
+### Added
+
+- `snare serve --web` — start a browser dashboard (default port 8080) alongside the proxy; the dashboard URL opens automatically in the default browser on startup.
+- `snare serve --web-port <port>` — choose the dashboard port (default: 8080).
+- `snare serve --browser` — when combined with `--web`, opens the proxy-configured browser at the dashboard URL instead of `about:blank`.
+- `snare serve` auto-creates a named run session (`run-YYYY-MM-DDTHH:MM:SS`) on startup and closes it on shutdown; every proxy run is automatically its own session.
+- `snare serve` pre-loads existing captures from disk into memory on startup; the web dashboard shows prior captures immediately without a full reload.
+- Web dashboard Mocks tab: add rules, view active rules, remove rules, and generate a mock from any captured response.
+- Web dashboard Intercept tab: view paused requests; forward, drop, or edit-and-forward each one from the browser.
+- Web dashboard Sessions tab: start, end, delete, and compare sessions from the browser.
+- Web dashboard capture diff: pin any capture and diff it against any other.
+- Web dashboard export: JSON, HAR, Postman collection, and OpenAPI 3.0 spec from the Export dropdown.
+- Web dashboard CA Cert button: download the CA certificate directly from the browser; shows per-device LAN URLs and installation instructions for iOS and Android.
+- Web dashboard SSE clear and delete events: all open browser tabs stay in sync when captures are deleted or cleared from any tab.
+- `snare tui` rebuilt with four full management tabs (press 1–4 to switch):
+  - **Captures** — browse, filter (`/`), inspect, replay (`r`), edit & replay (`e`), mock from capture (`m`), delete (`d`), clear all (`C`), diff two captures (space + `D`).
+  - **Mocks** — view rules, add (`a`), delete (`d`), clear all (`C`).
+  - **Intercept** — view pending, forward (`f`), drop (`x`), edit & forward (`e`).
+  - **Sessions** — start (`s`), end (`e`), delete (`x`), diff (space + `D`).
+- `snare tui --proxy <url>` — route TUI replays through a proxy so they are captured (default: `http://127.0.0.1:8888`).
+- `snare replay` now routes through the snare proxy by default (`--proxy http://127.0.0.1:8888`) so every replay is captured and inspectable; override with `--proxy ""` to bypass.
+- `snare session delete <name>` — delete a named session.
+- `snare serve --shadow <url>` — silently mirror every proxied request to a second target; the client response is unaffected. Repeatable.
+- `snare serve --plugin <cmd>` — run a plugin command for every capture; the full capture JSON is written to its stdin. Repeatable. Distinct from `--on-capture`: multiple plugins can be registered independently.
+- `snare session start <name>` — mark the start of a named capture session.
+- `snare session end <name>` — mark the end of a named capture session.
+- `snare session list` — list all recorded sessions.
+- `snare session diff <a> <b>` — compare the capture sequences from two sessions: shows mismatched methods, paths, and status codes by position.
+- gRPC capture: requests with `Content-Type: application/grpc*` are parsed into length-prefixed frames stored under `grpc.frames` in the capture JSON. The service method is recorded under `grpc.method`. Frames are shown in the TUI detail view, `snare show`, and the browser dashboard.
+- `~/.snare/config.yaml` — config file; all `snare serve` flags can be set here. CLI flags override config values. Suppress with `--no-config`.
+
+### Fixed
+
+- Mock rules added or removed from the CLI or TUI now take effect immediately in the running proxy without a restart; the mock store reloads from disk on every request match.
+
 ## [1.9.0] - 2026-05-15
 
 ### Added
@@ -129,7 +166,8 @@ First release.
 - Body decompression (gzip, deflate, brotli) for readable captures.
 - Config via `SNARE_STORE`, `SNARE_CA` and serve flags (port, bind, max-captures).
 
-[Unreleased]: https://github.com/muxover/snare/compare/v1.9.0...HEAD
+[Unreleased]: https://github.com/muxover/snare/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/muxover/snare/releases/tag/v2.0.0
 [1.9.0]: https://github.com/muxover/snare/releases/tag/v1.9.0
 [1.8.0]: https://github.com/muxover/snare/releases/tag/v1.8.0
 [1.7.0]: https://github.com/muxover/snare/releases/tag/v1.7.0

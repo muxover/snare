@@ -24,6 +24,8 @@ import (
 	"github.com/muxover/snare/mock"
 	"github.com/muxover/snare/proxy"
 	"github.com/muxover/snare/proxy/cert"
+	sess "github.com/muxover/snare/session"
+	"github.com/muxover/snare/web"
 	"github.com/spf13/cobra"
 )
 
@@ -52,6 +54,11 @@ var (
 	serveDelay            time.Duration
 	serveChaos            float64
 	serveBrowser          bool
+	serveShadow           []string
+	servePlugins          []string
+	serveWeb              bool
+	serveWebPort          string
+	serveNoConfig         bool
 )
 
 var serveCmd = &cobra.Command{
@@ -86,9 +93,20 @@ func init() {
 	serveCmd.Flags().DurationVar(&serveDelay, "delay", 0, "Add artificial latency to every response (e.g. 200ms, 1s)")
 	serveCmd.Flags().Float64Var(&serveChaos, "chaos", 0, "Randomly drop this percentage of requests (0-100)")
 	serveCmd.Flags().BoolVar(&serveBrowser, "browser", false, "Launch system browser with proxy pre-configured after start")
+	serveCmd.Flags().StringArrayVar(&serveShadow, "shadow", nil, "Mirror traffic to this URL silently (repeatable)")
+	serveCmd.Flags().StringArrayVar(&servePlugins, "plugin", nil, "Run plugin command per capture; capture JSON on stdin (repeatable)")
+	serveCmd.Flags().BoolVar(&serveWeb, "web", false, "Start web dashboard")
+	serveCmd.Flags().StringVar(&serveWebPort, "web-port", "8080", "Port for web dashboard (default: 8080)")
+	serveCmd.Flags().BoolVar(&serveNoConfig, "no-config", false, "Ignore ~/.snare/config.yaml")
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
+	if !serveNoConfig {
+		if err := applyFileConfig(cmd); err != nil {
+			return fmt.Errorf("config file: %w", err)
+		}
+	}
+
 	port, err := parsePort(servePort)
 	if err != nil {
 		return err
@@ -182,6 +200,26 @@ func runServe(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	shadows, err := parseShadowURLs(serveShadow)
+	if err != nil {
+		return err
+	}
+
+	var webSrv *web.Server
+	var onCapture func(*capture.Capture)
+	baseOnCapture := buildOnCapture(serveOnCapture)
+	if serveWeb {
+		webSrv = &web.Server{Store: store, Mocks: mocks, Transport: transport, Intercept: interceptQueue, CADir: config.CADir(), WebPort: serveWebPort, ProxyAddr: serveBind + ":" + servePort}
+		onCapture = func(c *capture.Capture) {
+			if baseOnCapture != nil {
+				baseOnCapture(c)
+			}
+			webSrv.NotifyCapture(c)
+		}
+	} else {
+		onCapture = baseOnCapture
+	}
+
 	handler := &proxy.Handler{
 		Transport:        transport,
 		Store:            store,
@@ -195,7 +233,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		HostRewrites:     rewrites,
 		AddHeaders:       addHeaders,
 		RemoveHeaders:    removeHeaders,
-		OnCapture:        buildOnCapture(serveOnCapture),
+		OnCapture:        onCapture,
 		IgnorePatterns:   serveIgnore,
 		MapRemotes:       mapRemotes,
 		BodyRewrites:     bodyRewrites,
@@ -204,6 +242,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 		ReverseTarget:    reverseTarget,
 		Delay:            serveDelay,
 		ChaosRate:        serveChaos,
+		Shadows:          shadows,
+		Plugins:          servePlugins,
 	}
 
 	addr := serveBind + ":" + servePort
@@ -228,14 +268,48 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 	srv.Start()
 
+	dashURL := ""
+	if serveWeb {
+		webPort, err := parsePort(serveWebPort)
+		if err != nil {
+			return fmt.Errorf("--web-port: %w", err)
+		}
+		webAddr := serveBind + ":" + webPort
+		webHTTP := &http.Server{Addr: webAddr, Handler: webSrv.Handler()}
+		go func() { _ = webHTTP.ListenAndServe() }()
+		dashURL = "http://127.0.0.1:" + webPort
+		log.Info("web dashboard", "addr", dashURL)
+		go openURL(dashURL)
+	}
+
 	if serveBrowser {
-		go openBrowser("http://"+addr, log)
+		target := dashURL
+		if target == "" {
+			target = "about:blank"
+		}
+		go openBrowser("http://"+addr, target, log)
+	}
+
+	runSession := "run-" + time.Now().Format("2006-01-02T15:04:05")
+	if sessions, err := sess.Load(); err == nil {
+		sessions[runSession] = sess.Entry{Start: time.Now()}
+		_ = sess.Save(sessions)
+		log.Info("run session started", "name", runSession)
 	}
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Info("shutting down...")
+	log.Info("shutting down ...")
+
+	if sessions, err := sess.Load(); err == nil {
+		if e, ok := sessions[runSession]; ok {
+			e.End = time.Now()
+			sessions[runSession] = e
+			_ = sess.Save(sessions)
+		}
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	return srv.Shutdown(ctx)
@@ -368,28 +442,42 @@ func buildOnCapture(cmd string) func(*capture.Capture) {
 	}
 }
 
-func openBrowser(proxyAddr string, log *slog.Logger) {
+func openURL(url string) {
+	time.Sleep(400 * time.Millisecond)
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "windows":
+		cmd = exec.Command("cmd", "/C", "start", url)
+	case "darwin":
+		cmd = exec.Command("open", url)
+	default:
+		cmd = exec.Command("xdg-open", url)
+	}
+	_ = cmd.Start()
+}
+
+func openBrowser(proxyAddr, targetURL string, log *slog.Logger) {
 	time.Sleep(300 * time.Millisecond)
 	proxyFlag := "--proxy-server=" + proxyAddr
 	var candidates [][]string
 	switch runtime.GOOS {
 	case "windows":
 		candidates = [][]string{
-			{"cmd", "/C", "start", "chrome", proxyFlag, "about:blank"},
-			{"cmd", "/C", "start", "msedge", proxyFlag, "about:blank"},
+			{"cmd", "/C", "start", "chrome", proxyFlag, targetURL},
+			{"cmd", "/C", "start", "msedge", proxyFlag, targetURL},
 		}
 	case "darwin":
 		candidates = [][]string{
-			{"open", "-a", "Google Chrome", "--args", proxyFlag},
-			{"open", "-a", "Microsoft Edge", "--args", proxyFlag},
-			{"open", "-a", "Chromium", "--args", proxyFlag},
+			{"open", "-a", "Google Chrome", "--args", proxyFlag, targetURL},
+			{"open", "-a", "Microsoft Edge", "--args", proxyFlag, targetURL},
+			{"open", "-a", "Chromium", "--args", proxyFlag, targetURL},
 		}
 	default:
 		candidates = [][]string{
-			{"google-chrome", proxyFlag},
-			{"chromium-browser", proxyFlag},
-			{"chromium", proxyFlag},
-			{"microsoft-edge", proxyFlag},
+			{"google-chrome", proxyFlag, targetURL},
+			{"chromium-browser", proxyFlag, targetURL},
+			{"chromium", proxyFlag, targetURL},
+			{"microsoft-edge", proxyFlag, targetURL},
 		}
 	}
 	for _, args := range candidates {
@@ -412,4 +500,72 @@ func normalizeHeaderNames(items []string) []string {
 		out = append(out, http.CanonicalHeaderKey(key))
 	}
 	return out
+}
+
+func parseShadowURLs(items []string) ([]*url.URL, error) {
+	out := make([]*url.URL, 0, len(items))
+	for _, s := range items {
+		u, err := url.Parse(s)
+		if err != nil || u.Host == "" {
+			return nil, fmt.Errorf("invalid --shadow URL %q", s)
+		}
+		out = append(out, u)
+	}
+	return out, nil
+}
+
+func applyFileConfig(cmd *cobra.Command) error {
+	cfg, err := config.LoadFileConfig()
+	if err != nil {
+		return err
+	}
+	set := func(name, val string) {
+		if val != "" && !cmd.Flags().Changed(name) {
+			_ = cmd.Flags().Set(name, val)
+		}
+	}
+	setBool := func(name string, val bool) {
+		if val && !cmd.Flags().Changed(name) {
+			_ = cmd.Flags().Set(name, "true")
+		}
+	}
+	setSlice := func(name string, vals []string) {
+		if len(vals) > 0 && !cmd.Flags().Changed(name) {
+			for _, v := range vals {
+				_ = cmd.Flags().Set(name, v)
+			}
+		}
+	}
+	set("port", cfg.Port)
+	set("bind", cfg.Bind)
+	set("mode", cfg.Mode)
+	set("target", cfg.Target)
+	set("upstream-proxy", cfg.UpstreamProxy)
+	set("mock-file", cfg.MockFile)
+	set("intercept", cfg.Intercept)
+	set("intercept-timeout", cfg.InterceptTimeout)
+	set("on-capture", cfg.OnCapture)
+	set("delay", cfg.Delay)
+	set("web-port", cfg.WebPort)
+	setBool("no-mitm", cfg.NoMITM)
+	setBool("verbose", cfg.Verbose)
+	setBool("web", cfg.Web)
+	if cfg.MaxCaptures > 0 && !cmd.Flags().Changed("max-captures") {
+		_ = cmd.Flags().Set("max-captures", fmt.Sprint(cfg.MaxCaptures))
+	}
+	if cfg.MaxBodySize > 0 && !cmd.Flags().Changed("max-body-size") {
+		_ = cmd.Flags().Set("max-body-size", fmt.Sprint(cfg.MaxBodySize))
+	}
+	if cfg.Chaos > 0 && !cmd.Flags().Changed("chaos") {
+		_ = cmd.Flags().Set("chaos", fmt.Sprintf("%g", cfg.Chaos))
+	}
+	setSlice("rewrite-host", cfg.RewriteHost)
+	setSlice("add-header", cfg.AddHeader)
+	setSlice("remove-header", cfg.RemoveHeader)
+	setSlice("ignore", cfg.Ignore)
+	setSlice("map-remote", cfg.MapRemote)
+	setSlice("rewrite-body", cfg.RewriteBody)
+	setSlice("shadow", cfg.Shadow)
+	setSlice("plugin", cfg.Plugins)
+	return nil
 }

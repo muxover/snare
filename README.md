@@ -3,9 +3,12 @@
 <div align="center">
 
 [![CI](https://github.com/muxover/snare/actions/workflows/ci.yml/badge.svg)](https://github.com/muxover/snare/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/muxover/snare.svg)](https://pkg.go.dev/github.com/muxover/snare)
+[![Go Report Card](https://goreportcard.com/badge/github.com/muxover/snare)](https://goreportcard.com/report/github.com/muxover/snare)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/muxover/snare)](https://github.com/muxover/snare/releases/latest)
 
-**Capture, inspect, and replay HTTP/HTTPS traffic from your terminal.**
+**Local HTTP/HTTPS proxy — capture, inspect, replay, and mock traffic.**
 
 </div>
 
@@ -78,7 +81,7 @@ No proxy env vars needed. All traffic to `127.0.0.1:8888` is forwarded to the ta
 
 | Command | Description |
 |---------|-------------|
-| `snare replay <id>` | Re-send a captured request |
+| `snare replay <id>` | Re-send a captured request through the snare proxy (captured by default) |
 | `snare replay --match <str>` | Re-send all captures whose URL contains this string |
 | `snare replay --edit` | Open capture in `$EDITOR` before sending |
 
@@ -107,7 +110,7 @@ No proxy env vars needed. All traffic to `127.0.0.1:8888` is forwarded to the ta
 |---------|-------------|
 | `snare import <file.har>` | Import a HAR file |
 | `snare save <id>` | Save a capture to a file |
-| `snare export` | Export captures to JSON, HAR, or Postman collection |
+| `snare export` | Export captures to JSON, HAR, Postman collection, or OpenAPI spec |
 | `snare curl <id>` | Print a capture as a `curl` command |
 
 **OpenAPI**
@@ -115,6 +118,16 @@ No proxy env vars needed. All traffic to `127.0.0.1:8888` is forwarded to the ta
 | Command | Description |
 |---------|-------------|
 | `snare openapi` | Generate an OpenAPI 3.0 spec from captured traffic |
+
+**Sessions**
+
+| Command | Description |
+|---------|-------------|
+| `snare session start <name>` | Mark the start of a named capture session |
+| `snare session end <name>` | Mark the end of a named capture session |
+| `snare session list` | List all recorded sessions |
+| `snare session delete <name>` | Delete a named session |
+| `snare session diff <a> <b>` | Compare two sessions' capture sequences |
 
 **Record / Playback**
 
@@ -129,7 +142,7 @@ No proxy env vars needed. All traffic to `127.0.0.1:8888` is forwarded to the ta
 |---------|-------------|
 | `snare pipe` | Stream captures as NDJSON; `--follow` to tail |
 | `snare assert` | Assert conditions on captures; exits 1 on failure |
-| `snare tui` | Interactive terminal UI |
+| `snare tui` | Interactive terminal UI — 4 tabs: Captures, Mocks, Intercept, Sessions |
 
 **CA**
 
@@ -166,7 +179,30 @@ No proxy env vars needed. All traffic to `127.0.0.1:8888` is forwarded to the ta
     --delay             Inject artificial latency before each response (e.g. 200ms)
     --chaos             Drop this percentage of requests randomly (e.g. 10)
     --browser           Auto-launch Chrome/Edge with proxy configured
+    --shadow            Mirror traffic to a second URL silently (repeatable)
+    --plugin            Run plugin command per capture; JSON on stdin (repeatable)
+    --web               Start web dashboard
+    --web-port          Port for web dashboard (default: 8080)
+    --no-config         Ignore ~/.snare/config.yaml
 -v, --verbose           Debug logging
+```
+
+## Config file
+
+Snare reads `~/.snare/config.yaml` on startup. All `snare serve` flags are supported:
+
+```yaml
+port: "8888"
+bind: "127.0.0.1"
+web: true
+web_port: "8080"
+ignore:
+  - /healthz
+  - /metrics
+shadow:
+  - http://staging.internal
+plugins:
+  - "jq . >> ~/snare-log.ndjson"
 ```
 
 ## list / watch Flags
@@ -191,6 +227,7 @@ No proxy env vars needed. All traffic to `127.0.0.1:8888` is forwarded to the ta
 -H, --header  Add or override header (repeatable)
     --match   Replay all captures matching this URL substring
     --edit    Open capture in $EDITOR before sending
+    --proxy   Proxy URL to route replay through (default: http://127.0.0.1:8888; set to empty to bypass)
 ```
 
 ## clear Flags
@@ -214,7 +251,7 @@ No proxy env vars needed. All traffic to `127.0.0.1:8888` is forwarded to the ta
 ## export Flags
 
 ```
--f, --format  Output format: json (default), har, postman
+-f, --format  Output format: json (default), har, postman, openapi
 -n, --last    Number of captures to export (default: 50)
 ```
 
@@ -314,6 +351,24 @@ snare playback cassette.json
 # Install CA on mobile
 snare ca install --device android
 snare ca install --device ios
+
+# Shadow traffic to a staging server
+snare serve --shadow http://staging.internal
+
+# Plugin: log all captures as NDJSON
+snare serve --plugin "jq -c . >> ~/captures.ndjson"
+
+# Web dashboard
+snare serve --web
+
+# Diff two test runs
+snare session start baseline
+# ... run tests ...
+snare session end baseline
+snare session start after-deploy
+# ... run tests ...
+snare session end after-deploy
+snare session diff baseline after-deploy
 ```
 
 ## Contributing
@@ -322,7 +377,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Licensed under [MIT](LICENSE).
+Licensed under the [MIT](LICENSE) license.
 
 ## Links
 

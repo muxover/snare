@@ -43,6 +43,18 @@ type Capture struct {
 	Duration  time.Duration     `json:"duration_ns,omitempty"`
 	Error     string            `json:"error,omitempty"`
 	WebSocket *WebSocketCapture `json:"websocket,omitempty"`
+	GRPC      *GRPCCapture      `json:"grpc,omitempty"`
+}
+
+type GRPCCapture struct {
+	ServiceMethod string      `json:"method,omitempty"`
+	Frames        []GRPCFrame `json:"frames,omitempty"`
+}
+
+type GRPCFrame struct {
+	Direction  string    `json:"direction"`
+	Compressed bool      `json:"compressed,omitempty"`
+	Data       BodyBytes `json:"data"`
 }
 
 type WebSocketCapture struct {

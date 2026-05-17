@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snare</title>
+<style>
+:root {
+  --bg: #0d1117; --surface: #161b22; --border: #30363d;
+  --text: #e6edf3; --muted: #7d8590; --accent: #58a6ff;
+  --green: #3fb950; --yellow: #d29922; --red: #f85149;
+  --blue: #58a6ff; --purple: #a371f7;
+  --font-mono: ui-monospace,'Cascadia Code','Fira Code','Consolas',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:13px;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+nav{display:flex;align-items:center;gap:10px;padding:0 14px;height:44px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.logo{font-size:14px;font-weight:700;letter-spacing:.5px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted);transition:background .3s}
+.dot.on{background:var(--green)}
+#live-lbl{font-size:11px;color:var(--muted)}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+#nav-count{font-size:11px;color:var(--muted)}
+.tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;padding:0 4px}
+.tab{padding:10px 16px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.active{color:var(--text);border-bottom-color:var(--accent)}
+.layout{display:flex;flex:1;overflow:hidden}
+.sidebar{width:400px;min-width:260px;display:flex;flex-direction:column;border-right:1px solid var(--border);flex-shrink:0}
+.filters{display:flex;gap:5px;padding:7px 8px;border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap}
+.filters input{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:4px 7px;border-radius:4px;font-size:12px;font-family:inherit}
+.filters input::placeholder{color:var(--muted)}
+.btn{padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;border:1px solid var(--border);color:var(--text);background:var(--surface);white-space:nowrap}
+.btn:hover{background:var(--border)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#0d1117;font-weight:600}
+.btn.primary:hover{filter:brightness(1.1)}
+.btn.danger{border-color:var(--red);color:var(--red)}
+.btn.danger:hover{background:rgba(248,81,73,.1)}
+.btn.warn{border-color:var(--yellow);color:var(--yellow)}
+.btn.warn:hover{background:rgba(210,153,34,.1)}
+.cap-list{overflow-y:auto;flex:1}
+.cap-row{display:flex;align-items:center;gap:7px;padding:6px 8px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none}
+.cap-row:hover{background:var(--surface)}
+.cap-row.active{background:rgba(88,166,255,.08);border-left:2px solid var(--accent);padding-left:6px}
+.cap-row.pinned{background:rgba(163,113,247,.08);border-left:2px solid var(--purple);padding-left:6px}
+.pill{font-family:var(--font-mono);font-size:10px;font-weight:600;padding:2px 5px;border-radius:3px;background:rgba(255,255,255,.07);min-width:38px;text-align:center}
+.st{font-family:var(--font-mono);font-size:11px;min-width:28px;text-align:right}
+.url-cell{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:12px}
+.dur{color:var(--muted);font-size:11px;white-space:nowrap}
+.GET{color:var(--green)}.POST{color:var(--blue)}.PUT{color:var(--yellow)}.DELETE{color:var(--red)}.PATCH{color:var(--purple)}
+.s2{color:var(--green)}.s3{color:var(--blue)}.s4{color:var(--yellow)}.s5{color:var(--red)}
+.main{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+.empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px}
+.detail{padding:14px}
+.dbar{display:flex;align-items:center;gap:8px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.durl{flex:1;font-family:var(--font-mono);font-size:12px;word-break:break-all}
+.sec{margin-bottom:14px}
+.sec-t{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;margin-bottom:7px}
+.kv{width:100%;border-collapse:collapse}
+.kv td{padding:3px 6px;font-family:var(--font-mono);font-size:11px;border-bottom:1px solid rgba(48,54,61,.5);vertical-align:top}
+.kv td:first-child{color:var(--muted);white-space:nowrap;padding-right:10px}
+.code{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:10px 12px;font-family:var(--font-mono);font-size:12px;white-space:pre-wrap;word-break:break-all;max-height:260px;overflow-y:auto;line-height:1.5}
+.frame-row{display:flex;gap:8px;margin-bottom:4px;align-items:flex-start}
+.frame-dir{font-size:11px;color:var(--muted);min-width:18px;padding-top:2px}
+.mocks-pane{padding:14px;overflow-y:auto;flex:1}
+.form-box{border:1px solid var(--border);border-radius:5px;padding:13px;background:var(--surface);margin-bottom:14px}
+.form-box h3{font-size:13px;font-weight:600;margin-bottom:11px}
+.fg4{display:grid;grid-template-columns:80px 1fr 70px 160px;gap:7px;margin-bottom:7px}
+.fg1{display:grid;grid-template-columns:1fr;margin-bottom:7px}
+.ff label{font-size:11px;color:var(--muted);display:block;margin-bottom:2px}
+.ff input,.ff textarea{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 7px;border-radius:4px;font-size:12px;font-family:inherit}
+.ff textarea{font-family:var(--font-mono);resize:vertical}
+.mock-item{display:flex;align-items:center;gap:8px;padding:9px 11px;border:1px solid var(--border);border-radius:4px;margin-bottom:7px;background:var(--surface)}
+.mock-meta{flex:1}
+.mock-name{font-weight:500;margin-bottom:2px}
+.mock-desc{color:var(--muted);font-size:11px;font-family:var(--font-mono)}
+.ic-pane{padding:14px;overflow-y:auto;flex:1}
+.ic-item{border:1px solid var(--border);border-radius:4px;padding:10px 12px;margin-bottom:8px;background:var(--surface)}
+.ic-bar{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.ic-url{flex:1;font-family:var(--font-mono);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.diff-pane{padding:14px;overflow-y:auto;flex:1}
+.diff-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.diff-col h4{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:8px}
+.diff-match{background:rgba(63,185,80,.06);border-left:2px solid var(--green)}
+.diff-miss{background:rgba(248,81,73,.06);border-left:2px solid var(--red)}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:18px;width:600px;max-width:95vw;max-height:85vh;overflow-y:auto}
+.modal h3{font-size:14px;font-weight:600;margin-bottom:14px}
+.modal-row{margin-bottom:10px}
+.modal-row label{font-size:11px;color:var(--muted);display:block;margin-bottom:3px}
+.modal-row input,.modal-row textarea{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:4px;font-size:12px;font-family:inherit}
+.modal-row textarea{font-family:var(--font-mono);resize:vertical}
+.modal-acts{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.drop-wrap{position:relative}
+.drop-menu{display:none;position:absolute;right:0;top:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;min-width:140px;z-index:50;margin-top:2px}
+.drop-menu.open{display:block}
+.drop-item{display:block;padding:7px 12px;color:var(--text);text-decoration:none;font-size:12px;cursor:pointer}
+.drop-item:hover{background:var(--border)}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.toast{position:fixed;bottom:20px;right:20px;padding:9px 16px;border-radius:5px;font-size:12px;font-weight:500;background:var(--surface);border:1px solid var(--border);color:var(--text);z-index:200;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+.toast.err{border-color:var(--red);color:var(--red)}
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="logo">Snare</span>
+  <div class="dot" id="ldot"></div>
+  <span id="live-lbl">connecting</span>
+  <div class="nav-right">
+    <span id="nav-count"></span>
+    <button class="btn" onclick="openCAModal()">CA Cert</button>
+    <div class="drop-wrap">
+      <button class="btn" onclick="toggleDrop(this)">Export</button>
+      <div class="drop-menu">
+        <a class="drop-item" href="/api/export?format=json" download="export.json">JSON</a>
+        <a class="drop-item" href="/api/export?format=har" download="export.har">HAR</a>
+        <a class="drop-item" href="/api/export?format=postman" download="export.postman_collection.json">Postman</a>
+        <a class="drop-item" href="/api/export?format=openapi" download="openapi.json">OpenAPI</a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('captures',this)">Captures</div>
+  <div class="tab" onclick="switchTab('mocks',this)">Mocks</div>
+  <div class="tab" onclick="switchTab('intercept',this)">Intercept</div>
+  <div class="tab" onclick="switchTab('sessions',this)">Sessions</div>
+</div>
+
+<!-- Captures tab -->
+<div id="tab-captures" class="layout">
+  <div class="sidebar">
+    <div class="filters">
+      <input id="f-url" placeholder="URL" style="flex:1;min-width:80px" oninput="renderList()">
+      <input id="f-method" placeholder="Method" style="width:65px" oninput="renderList()">
+      <input id="f-status" placeholder="Status" style="width:56px" oninput="renderList()">
+      <input id="f-body" placeholder="Body" style="width:70px" oninput="renderList()">
+      <button class="btn" onclick="clearAll()">Clear</button>
+    </div>
+    <div class="cap-list" id="cap-list"></div>
+  </div>
+  <div class="main" id="main-panel">
+    <div class="empty">Select a capture to inspect</div>
+  </div>
+</div>
+
+<!-- Mocks tab -->
+<div id="tab-mocks" style="display:none;flex:1;overflow:hidden;flex-direction:column">
+  <div class="mocks-pane">
+    <div class="form-box">
+      <h3>Add mock rule</h3>
+      <div class="fg4">
+        <div class="ff"><label>Method</label><input id="m-method" placeholder="GET"></div>
+        <div class="ff"><label>URL substring</label><input id="m-url" placeholder="/api/users"></div>
+        <div class="ff"><label>Status</label><input id="m-status" placeholder="200"></div>
+        <div class="ff"><label>Content-Type</label><input id="m-ct" placeholder="application/json"></div>
+      </div>
+      <div class="fg1"><div class="ff"><label>Response body</label><textarea id="m-body" rows="3" placeholder='{"ok":true}'></textarea></div></div>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <button class="btn primary" onclick="addMock()">Add rule</button>
+        <button class="btn danger" onclick="clearMocks()">Clear all</button>
+      </div>
+    </div>
+    <div id="mock-list"></div>
+  </div>
+</div>
+
+<!-- Intercept tab -->
+<div id="tab-intercept" style="display:none;flex:1;overflow:hidden;flex-direction:column">
+  <div class="ic-pane">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <span style="font-size:13px;font-weight:500">Paused requests</span>
+      <button class="btn" onclick="loadIntercept()">Refresh</button>
+    </div>
+    <div id="ic-list"><div style="color:var(--muted)">No paused requests.</div></div>
+  </div>
+</div>
+
+<!-- Sessions tab -->
+<div id="tab-sessions" style="display:none;flex:1;overflow:hidden;flex-direction:column">
+  <div style="padding:14px;overflow-y:auto;flex:1">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <span style="font-size:13px;font-weight:500">Named sessions</span>
+      <button class="btn primary" onclick="openSessModal()">Start session</button>
+      <button class="btn" onclick="loadSessions()">Refresh</button>
+    </div>
+    <div id="sess-list"><div style="color:var(--muted)">No sessions recorded.</div></div>
+    <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Compare sessions</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select id="sess-a" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:4px;font-size:12px"><option value="">Session A</option></select>
+        <select id="sess-b" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:4px;font-size:12px"><option value="">Session B</option></select>
+        <button class="btn primary" onclick="compareSessions()">Compare</button>
+      </div>
+      <div id="sess-diff" style="margin-top:14px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Start session modal -->
+<div class="modal-bg" id="sess-modal">
+  <div class="modal">
+    <h3>Start session</h3>
+    <div class="modal-row"><label>Session name</label><input id="sess-name-input" placeholder="e.g. before-deploy"></div>
+    <div class="modal-acts">
+      <button class="btn" onclick="closeModal('sess-modal')">Cancel</button>
+      <button class="btn primary" onclick="startSession()">Start</button>
+    </div>
+  </div>
+</div>
+
+<!-- CA cert modal -->
+<div class="modal-bg" id="ca-modal">
+  <div class="modal">
+    <h3>CA Certificate</h3>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:14px">Install this certificate to inspect HTTPS traffic from any device.</p>
+    <div id="ca-content"><div style="color:var(--muted)">Loading...</div></div>
+    <div class="modal-acts"><button class="btn" onclick="closeModal('ca-modal')">Close</button></div>
+  </div>
+</div>
+
+<!-- Edit/Replay modal -->
+<div class="modal-bg" id="replay-modal">
+  <div class="modal">
+    <h3>Edit &amp; Replay</h3>
+    <div class="modal-row"><label>Method</label><input id="rm-method"></div>
+    <div class="modal-row"><label>URL</label><input id="rm-url"></div>
+    <div class="modal-row"><label>Headers (JSON object)</label><textarea id="rm-headers" rows="5"></textarea></div>
+    <div class="modal-row"><label>Body</label><textarea id="rm-body" rows="4"></textarea></div>
+    <div class="modal-acts">
+      <button class="btn" onclick="closeModal('replay-modal')">Cancel</button>
+      <button class="btn primary" onclick="sendReplay()">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- Intercept edit modal -->
+<div class="modal-bg" id="ic-modal">
+  <div class="modal">
+    <h3>Edit &amp; Forward</h3>
+    <input type="hidden" id="ic-edit-id">
+    <div class="modal-row"><label>Method</label><input id="ic-method"></div>
+    <div class="modal-row"><label>Headers (JSON object)</label><textarea id="ic-headers" rows="5"></textarea></div>
+    <div class="modal-row"><label>Body</label><textarea id="ic-body" rows="4"></textarea></div>
+    <div class="modal-acts">
+      <button class="btn" onclick="closeModal('ic-modal')">Cancel</button>
+      <button class="btn primary" onclick="sendInterceptEdit()">Forward</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let captures = [];
+let activeId = null;
+let pinnedId = null;
+let interceptItems = {};
+
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const scls = s => !s?'':s<300?'s2':s<400?'s3':s<500?'s4':'s5';
+const fmtDur = ns => !ns?'':ns/1e6<1000?(ns/1e6).toFixed(0)+'ms':(ns/1e6/1000).toFixed(2)+'s';
+const urlPath = r => { try{return new URL(r).pathname}catch{return r} };
+
+function renderList() {
+  const fu = document.getElementById('f-url').value.toLowerCase();
+  const fm = document.getElementById('f-method').value.toUpperCase();
+  const fs = document.getElementById('f-status').value;
+  const fb = document.getElementById('f-body').value.toLowerCase();
+  const list = captures.filter(c => {
+    if (fu && !c.request.url.toLowerCase().includes(fu)) return false;
+    if (fm && c.request.method !== fm) return false;
+    if (fs && String(c.response?.status_code??'') !== fs) return false;
+    if (fb) {
+      const rb = String(c.request.body??'').toLowerCase();
+      const resb = String(c.response?.body??'').toLowerCase();
+      if (!rb.includes(fb) && !resb.includes(fb)) return false;
+    }
+    return true;
+  });
+  document.getElementById('nav-count').textContent = `${list.length}/${captures.length}`;
+  document.getElementById('cap-list').innerHTML = list.map(c => {
+    const s = c.response?.status_code;
+    const m = c.request.method;
+    const cls = c.id===activeId?' active':c.id===pinnedId?' pinned':'';
+    return `<div class="cap-row${cls}" onclick="select('${c.id}')">
+      <span class="pill ${m}">${esc(m)}</span>
+      <span class="st ${scls(s)}">${s||'—'}</span>
+      <span class="url-cell" title="${esc(c.request.url)}">${esc(urlPath(c.request.url))}</span>
+      <span class="dur">${fmtDur(c.duration_ns)}</span>
+    </div>`;
+  }).join('');
+}
+
+async function load() {
+  const r = await fetch('/api/captures?limit=1000');
+  captures = (await r.json())||[];
+  renderList();
+}
+
+function select(id) {
+  activeId = id;
+  renderList();
+  const c = captures.find(x=>x.id===id);
+  if (c) showDetail(c);
+}
+
+function hdrsHTML(h) {
+  if (!h) return '';
+  return Object.entries(h).map(([k,vs])=>vs.map(v=>`<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')).join('');
+}
+
+function showDetail(c) {
+  const s = c.response?.status_code;
+  const m = c.request.method;
+  const isPinned = c.id === pinnedId;
+  let html = `<div class="detail">
+    <div class="dbar">
+      <span class="pill ${m}" style="font-size:12px">${esc(m)}</span>
+      <span class="st ${scls(s)}" style="font-size:13px">${s||''}</span>
+      <span class="durl">${esc(c.request.url)}</span>
+      <button class="btn primary" onclick="openReplayModal('${c.id}')">Replay</button>
+      <button class="btn" onclick="copyCurl('${c.id}')">Copy curl</button>
+      <button class="btn" onclick="mockFromCapture('${c.id}')">Mock</button>
+      <button class="btn ${isPinned?'warn':''}" onclick="togglePin('${c.id}')">${isPinned?'Unpin':'Pin for diff'}</button>
+      ${pinnedId && pinnedId!==c.id?`<button class="btn" style="border-color:var(--purple);color:var(--purple)" onclick="showDiff('${pinnedId}','${c.id}')">Diff vs pinned</button>`:''}
+      <button class="btn danger" onclick="del('${c.id}')">Delete</button>
+    </div>
+    <div class="sec"><div class="sec-t">Request headers</div><table class="kv"><tbody>${hdrsHTML(c.request.headers)}</tbody></table></div>`;
+  if (c.request.body) {
+    html+=`<div class="sec"><div class="sec-t">Request body</div><div class="code">${esc(c.request.body)}</div></div>`;
+  }
+  if (c.response) {
+    html+=`<div class="sec"><div class="sec-t">Response headers</div><table class="kv"><tbody>${hdrsHTML(c.response.headers)}</tbody></table></div>`;
+    if (c.response.body) {
+      let body=c.response.body;
+      try{body=JSON.stringify(JSON.parse(body),null,2)}catch{}
+      html+=`<div class="sec"><div class="sec-t">Response body</div><div class="code">${esc(body)}</div></div>`;
+    }
+  }
+  if (c.grpc) {
+    html+=`<div class="sec"><div class="sec-t">gRPC — ${esc(c.grpc.method||'')}</div>${(c.grpc.frames||[]).map(f=>`<div class="frame-row"><span class="frame-dir">${f.direction==='request'?'→':'←'}</span><div style="flex:1"><div class="code" style="max-height:80px">${esc(f.data||'')}</div></div></div>`).join('')}</div>`;
+  }
+  if (c.websocket?.frames?.length) {
+    html+=`<div class="sec"><div class="sec-t">WebSocket frames (${c.websocket.frames.length})</div>${c.websocket.frames.slice(0,30).map(f=>`<div class="frame-row"><span class="frame-dir">${f.direction==='s2c'?'←':'→'}</span><div style="flex:1"><div class="code" style="max-height:60px">${esc(f.payload||'')}</div></div></div>`).join('')}</div>`;
+  }
+  html+='</div>';
+  document.getElementById('main-panel').innerHTML=html;
+}
+
+function togglePin(id) {
+  pinnedId = pinnedId===id ? null : id;
+  renderList();
+  const c = captures.find(x=>x.id===activeId);
+  if (c) showDetail(c);
+}
+
+function showDiff(idA, idB) {
+  const a = captures.find(x=>x.id===idA);
+  const b = captures.find(x=>x.id===idB);
+  if (!a||!b) return;
+  const fields = [
+    ['Method', a.request.method, b.request.method],
+    ['URL', a.request.url, b.request.url],
+    ['Status', String(a.response?.status_code??'—'), String(b.response?.status_code??'—')],
+    ['Duration', fmtDur(a.duration_ns), fmtDur(b.duration_ns)],
+    ['Request body', String(a.request.body??''), String(b.request.body??'')],
+    ['Response body', String(a.response?.body??''), String(b.response?.body??'')],
+  ];
+  let rows='';
+  for (const [label,va,vb] of fields) {
+    const match = va===vb;
+    rows+=`<tr class="${match?'diff-match':'diff-miss'}" style="border-bottom:1px solid var(--border)">
+      <td style="padding:5px 8px;font-size:11px;color:var(--muted);white-space:nowrap;font-family:var(--font-mono)">${esc(label)}</td>
+      <td style="padding:5px 8px;font-family:var(--font-mono);font-size:11px;word-break:break-all"><div style="max-height:80px;overflow:auto">${esc(va)}</div></td>
+      <td style="padding:5px 8px;font-family:var(--font-mono);font-size:11px;word-break:break-all"><div style="max-height:80px;overflow:auto">${esc(vb)}</div></td>
+    </tr>`;
+  }
+  document.getElementById('main-panel').innerHTML=`<div class="detail">
+    <div class="dbar">
+      <span style="font-weight:600">Diff</span>
+      <span style="color:var(--muted);font-size:12px">${esc(urlPath(a.request.url))}</span>
+      <span style="color:var(--muted)">vs</span>
+      <span style="color:var(--muted);font-size:12px">${esc(urlPath(b.request.url))}</span>
+      <button class="btn" onclick="showDetail(captures.find(x=>x.id==='${idB}'))">Back</button>
+    </div>
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr>
+        <th style="padding:5px 8px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border)">Field</th>
+        <th style="padding:5px 8px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border)">Pinned</th>
+        <th style="padding:5px 8px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border)">Current</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+let replayCapId = null;
+function openReplayModal(id) {
+  const c = captures.find(x=>x.id===id);
+  if (!c) return;
+  replayCapId = id;
+  document.getElementById('rm-method').value = c.request.method;
+  document.getElementById('rm-url').value = c.request.url;
+  const hdrs = {};
+  for (const [k,vs] of Object.entries(c.request.headers||{})) hdrs[k]=vs[0];
+  document.getElementById('rm-headers').value = JSON.stringify(hdrs, null, 2);
+  document.getElementById('rm-body').value = c.request.body||'';
+  openModal('replay-modal');
+}
+
+async function sendReplay() {
+  const method = document.getElementById('rm-method').value;
+  const url = document.getElementById('rm-url').value;
+  let headers = {};
+  try { headers = JSON.parse(document.getElementById('rm-headers').value||'{}'); } catch {}
+  const body = document.getElementById('rm-body').value;
+  const payload = {method, url, headers, body};
+  const r = await fetch(`/api/captures/${replayCapId}/replay`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(payload)
+  });
+  closeModal('replay-modal');
+  if (!r.ok) { showToast('Replay failed', true); return; }
+  const j = await r.json();
+  showToast(`Replayed — ${j.status}`);
+}
+
+function copyCurl(id) {
+  const c = captures.find(x=>x.id===id);
+  if (!c) return;
+  const skip = new Set(['content-length','transfer-encoding','connection','proxy-connection']);
+  let cmd = `curl -X ${c.request.method} '${c.request.url.replace(/'/g,"'\\''")}'`;
+  for (const [k,vs] of Object.entries(c.request.headers||{})) {
+    if (skip.has(k.toLowerCase())) continue;
+    for (const v of vs) cmd += `\n  -H '${k}: ${v.replace(/'/g,"'\\''")}' `;
+  }
+  if (c.request.body) cmd+=`\n  --data '${String(c.request.body).replace(/'/g,"'\\''")}'`;
+  navigator.clipboard.writeText(cmd).then(()=>alert('curl command copied to clipboard'));
+}
+
+function mockFromCapture(id) {
+  const c = captures.find(x=>x.id===id);
+  if (!c) return;
+  document.getElementById('m-method').value = c.request.method;
+  try { document.getElementById('m-url').value = new URL(c.request.url).pathname; } catch { document.getElementById('m-url').value = c.request.url; }
+  document.getElementById('m-status').value = c.response?.status_code||200;
+  document.getElementById('m-ct').value = c.response?.headers?.['Content-Type']?.[0]||'application/json';
+  document.getElementById('m-body').value = c.response?.body||'';
+  switchTabByName('mocks');
+}
+
+async function del(id) {
+  await fetch(`/api/captures/${id}`, {method:'DELETE'});
+  captures = captures.filter(c=>c.id!==id);
+  if (activeId===id) { activeId=null; document.getElementById('main-panel').innerHTML='<div class="empty">Select a capture to inspect</div>'; }
+  if (pinnedId===id) pinnedId=null;
+  renderList();
+}
+
+async function clearAll() {
+  if (!confirm('Delete all captures?')) return;
+  await fetch('/api/captures', {method:'DELETE'});
+  captures=[]; activeId=null; pinnedId=null;
+  document.getElementById('main-panel').innerHTML='<div class="empty">Select a capture to inspect</div>';
+  renderList();
+}
+
+async function loadMocks() {
+  const r = await fetch('/api/mocks');
+  const mocks=(await r.json())||[];
+  document.getElementById('mock-list').innerHTML = mocks.length
+    ? mocks.map(m=>`<div class="mock-item">
+        <div class="mock-meta">
+          <div class="mock-name">${esc(m.name||m.id.slice(0,8))}</div>
+          <div class="mock-desc">${esc(m.method||'*')} ${esc(m.url_pattern)} → ${m.status}</div>
+        </div>
+        <button class="btn danger" onclick="removeMock('${m.id}')">Remove</button>
+      </div>`).join('')
+    : '<div style="color:var(--muted);padding:6px">No mock rules.</div>';
+}
+
+async function addMock() {
+  const body={method:document.getElementById('m-method').value,url_match:document.getElementById('m-url').value,status:parseInt(document.getElementById('m-status').value)||200,content_type:document.getElementById('m-ct').value||'application/json',body:document.getElementById('m-body').value};
+  if (!body.url_match){alert('URL substring is required');return;}
+  await fetch('/api/mocks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  loadMocks();
+}
+
+async function removeMock(id) {
+  await fetch(`/api/mocks/${id}`,{method:'DELETE'});
+  loadMocks();
+}
+
+async function clearMocks() {
+  if (!confirm('Remove all mock rules?')) return;
+  await fetch('/api/mocks',{method:'DELETE'});
+  loadMocks();
+}
+
+async function loadIntercept() {
+  const r = await fetch('/api/intercept');
+  const items=(await r.json())||[];
+  interceptItems = {};
+  items.forEach(p => { interceptItems[p.id] = p; });
+  document.getElementById('ic-list').innerHTML = items.length
+    ? items.map(p=>`<div class="ic-item">
+        <div class="ic-bar">
+          <span class="pill ${p.method}">${esc(p.method)}</span>
+          <span class="ic-url" title="${esc(p.url)}">${esc(p.url)}</span>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn primary" onclick="icForward('${p.id}')">Forward</button>
+          <button class="btn" onclick="openIcEdit('${p.id}')">Edit</button>
+          <button class="btn danger" onclick="icDrop('${p.id}')">Drop</button>
+        </div>
+      </div>`).join('')
+    : '<div style="color:var(--muted)">No paused requests.</div>';
+}
+
+async function icForward(id) {
+  await fetch(`/api/intercept/${id}/forward`,{method:'POST'});
+  loadIntercept();
+}
+
+async function icDrop(id) {
+  await fetch(`/api/intercept/${id}/drop`,{method:'POST'});
+  loadIntercept();
+}
+
+function openIcEdit(id) {
+  const p = interceptItems[id];
+  if (!p) return;
+  document.getElementById('ic-edit-id').value = id;
+  document.getElementById('ic-method').value = p.method;
+  document.getElementById('ic-headers').value = JSON.stringify(p.headers||{}, null, 2);
+  document.getElementById('ic-body').value = p.body||'';
+  openModal('ic-modal');
+}
+
+async function sendInterceptEdit() {
+  const id = document.getElementById('ic-edit-id').value;
+  let headers = {};
+  try { headers = JSON.parse(document.getElementById('ic-headers').value||'{}'); } catch {}
+  const mod = {
+    mod_method: document.getElementById('ic-method').value,
+    mod_headers: headers,
+    mod_body: document.getElementById('ic-body').value,
+  };
+  await fetch(`/api/intercept/${id}/edit`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(mod)});
+  closeModal('ic-modal');
+  loadIntercept();
+}
+
+async function openCAModal() {
+  openModal('ca-modal');
+  const r = await fetch('/api/info');
+  const info = await r.json();
+  const el = document.getElementById('ca-content');
+  if (!info.ca_available) {
+    el.innerHTML = `<div style="color:var(--red)">CA certificate not found. Run <code style="font-family:var(--font-mono)">snare ca generate</code> first.</div>`;
+    return;
+  }
+  const port = info.web_port || '8080';
+  const lanURLs = (info.lan_ips||[]).map(ip => `http://${ip}:${port}/ca.pem`);
+  const localURL = `http://localhost:${port}/ca.pem`;
+  let html = `
+    <div class="sec">
+      <div class="sec-t">Desktop</div>
+      <a class="btn primary" href="/ca.pem" download="snare-ca.pem" style="display:inline-block;margin-bottom:4px">Download snare-ca.pem</a>
+    </div>`;
+  if (lanURLs.length > 0) {
+    html += `<div class="sec"><div class="sec-t">Mobile — open this URL in Safari / Chrome on your device</div>`;
+    lanURLs.forEach(u => {
+      html += `<div style="font-family:var(--font-mono);font-size:12px;padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;margin-bottom:6px;word-break:break-all">${esc(u)}</div>`;
+    });
+    html += `</div>
+    <div class="sec">
+      <div class="sec-t">iOS</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.7">1. Open the URL above in <b>Safari</b> → tap Allow<br>2. Go to <b>Settings → General → VPN &amp; Device Management</b><br>3. Tap the Snare profile → Install<br>4. Go to <b>Settings → General → About → Certificate Trust Settings</b><br>5. Enable full trust for Snare CA</div>
+    </div>
+    <div class="sec">
+      <div class="sec-t">Android</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.7">1. Open the URL above in Chrome → download the file<br>2. Go to <b>Settings → Security → Install from storage</b><br>3. Select <b>snare-ca.pem</b> and install as a CA certificate<br><span style="color:var(--yellow)">Android 11+: Settings → Security → Advanced → Encryption &amp; credentials → Install a certificate → CA certificate</span></div>
+    </div>`;
+  } else {
+    html += `<div style="color:var(--yellow);font-size:12px">No LAN IP detected. Start snare with <code style="font-family:var(--font-mono)">--bind 0.0.0.0</code> to allow mobile devices to connect.</div>`;
+  }
+  el.innerHTML = html;
+}
+
+let toastTimer;
+function showToast(msg, err=false) {
+  let t = document.getElementById('toast');
+  if (!t) { t = document.createElement('div'); t.id='toast'; t.className='toast'; document.body.appendChild(t); }
+  t.textContent = msg;
+  t.className = 'toast' + (err?' err':'');
+  clearTimeout(toastTimer);
+  requestAnimationFrame(()=>{ t.classList.add('show'); });
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 3000);
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
+
+function toggleDrop(btn) {
+  const menu = btn.nextElementSibling;
+  menu.classList.toggle('open');
+  const close = e => { if(!btn.contains(e.target)&&!menu.contains(e.target)) { menu.classList.remove('open'); document.removeEventListener('click',close); }};
+  setTimeout(()=>document.addEventListener('click',close),0);
+}
+
+let activeTabName = 'captures';
+function switchTab(name, el) { switchTabByName(name); }
+function switchTabByName(name) {
+  activeTabName = name;
+  const tabNames = ['captures','mocks','intercept','sessions'];
+  tabNames.forEach(n => {
+    document.getElementById('tab-'+n).style.display = n===name?'flex':'none';
+  });
+  document.querySelectorAll('.tab').forEach((t,i)=>{ if(tabNames[i]===name) t.classList.add('active'); else t.classList.remove('active'); });
+  if (name==='mocks') loadMocks();
+  if (name==='intercept') loadIntercept();
+  if (name==='sessions') loadSessions();
+}
+
+async function loadSessions() {
+  const r = await fetch('/api/sessions');
+  const sessions = (await r.json())||[];
+  const selA = document.getElementById('sess-a');
+  const selB = document.getElementById('sess-b');
+  const prevA = selA.value, prevB = selB.value;
+  selA.innerHTML = '<option value="">Session A</option>';
+  selB.innerHTML = '<option value="">Session B</option>';
+  sessions.forEach(s => {
+    const opt = `<option value="${esc(s.name)}">${esc(s.name)}</option>`;
+    selA.innerHTML += opt;
+    selB.innerHTML += opt;
+  });
+  selA.value = prevA;
+  selB.value = prevB;
+  document.getElementById('sess-list').innerHTML = sessions.length
+    ? sessions.map(s => `<div class="ic-item">
+        <div class="ic-bar">
+          <span style="font-weight:500">${esc(s.name)}</span>
+          ${s.active ? '<span style="font-size:11px;color:var(--green);margin-left:6px">active</span>' : ''}
+          <span style="margin-left:auto;font-size:11px;color:var(--muted)">${esc(s.start_formatted)}${s.end_formatted?' → '+esc(s.end_formatted):''}</span>
+          <span style="font-size:11px;color:var(--muted)">${s.count} req</span>
+        </div>
+        <div style="display:flex;gap:6px">
+          ${s.active ? `<button class="btn" onclick="endSession('${esc(s.name)}')">End</button>` : ''}
+          <button class="btn danger" onclick="deleteSession('${esc(s.name)}')">Delete</button>
+        </div>
+      </div>`).join('')
+    : '<div style="color:var(--muted)">No sessions recorded.</div>';
+}
+
+function openSessModal() {
+  document.getElementById('sess-name-input').value = '';
+  openModal('sess-modal');
+}
+
+async function startSession() {
+  const name = document.getElementById('sess-name-input').value.trim();
+  if (!name) { alert('Name is required'); return; }
+  await fetch(`/api/sessions/${encodeURIComponent(name)}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'start'})});
+  closeModal('sess-modal');
+  loadSessions();
+}
+
+async function endSession(name) {
+  await fetch(`/api/sessions/${encodeURIComponent(name)}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'end'})});
+  loadSessions();
+}
+
+async function deleteSession(name) {
+  await fetch(`/api/sessions/${encodeURIComponent(name)}`, {method:'DELETE'});
+  loadSessions();
+}
+
+async function compareSessions() {
+  const a = document.getElementById('sess-a').value;
+  const b = document.getElementById('sess-b').value;
+  if (!a || !b) { alert('Select both sessions'); return; }
+  const r = await fetch(`/api/sessions/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`);
+  const diff = await r.json();
+  let html = `<div style="font-size:12px;color:var(--muted);margin-bottom:10px">${esc(a)} (${diff.count_a} req) vs ${esc(b)} (${diff.count_b} req)</div>`;
+  if (!diff.rows || diff.rows.length===0) {
+    html += '<div style="color:var(--green)">Sessions match.</div>';
+  } else {
+    html += `<table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr>
+        <th style="padding:4px 8px;text-align:left;color:var(--muted);border-bottom:1px solid var(--border)">#</th>
+        <th style="padding:4px 8px;text-align:left;color:var(--muted);border-bottom:1px solid var(--border)">${esc(a)}</th>
+        <th style="padding:4px 8px;text-align:left;color:var(--muted);border-bottom:1px solid var(--border)">${esc(b)}</th>
+      </tr></thead><tbody>`;
+    diff.rows.forEach(row => {
+      const cls = row.match ? 'diff-match' : 'diff-miss';
+      html += `<tr class="${cls}"><td style="padding:4px 8px;color:var(--muted)">${row.index}</td>
+        <td style="padding:4px 8px;font-family:var(--font-mono)">${esc(row.line_a||'—')}</td>
+        <td style="padding:4px 8px;font-family:var(--font-mono)">${esc(row.line_b||'—')}</td></tr>`;
+    });
+    html += `</tbody></table>`;
+    html += `<div style="margin-top:10px;font-size:12px;color:var(--red)">${diff.diffs} difference(s) found.</div>`;
+  }
+  document.getElementById('sess-diff').innerHTML = html;
+}
+
+function connectSSE() {
+  const es = new EventSource('/api/events');
+  es.onopen = () => { document.getElementById('ldot').className='dot on'; document.getElementById('live-lbl').textContent='live'; };
+  es.onmessage = e => {
+    const c = JSON.parse(e.data);
+    const i = captures.findIndex(x=>x.id===c.id);
+    if (i>=0) captures[i]=c; else captures.unshift(c);
+    renderList();
+    if (activeId===c.id) showDetail(c);
+  };
+  es.addEventListener('cleared', () => {
+    captures = []; activeId = null; pinnedId = null;
+    renderList();
+    document.getElementById('main-panel').innerHTML = '<div class="empty">Select a capture to inspect</div>';
+  });
+  es.addEventListener('deleted', e => {
+    const id = JSON.parse(e.data);
+    captures = captures.filter(c => c.id !== id);
+    if (activeId === id) { activeId = null; document.getElementById('main-panel').innerHTML = '<div class="empty">Select a capture to inspect</div>'; }
+    if (pinnedId === id) pinnedId = null;
+    renderList();
+  });
+  es.onerror = () => {
+    document.getElementById('ldot').className='dot';
+    document.getElementById('live-lbl').textContent='disconnected';
+    es.close();
+    setTimeout(connectSSE,3000);
+  };
+}
+
+load();
+connectSSE();
+</script>
+</body>
+</html>

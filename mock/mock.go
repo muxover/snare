@@ -40,6 +40,9 @@ func NewStore(path string) *Store {
 }
 
 func (s *Store) Rules() []*Rule {
+	s.mu.Lock()
+	_ = s.load()
+	s.mu.Unlock()
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	out := make([]*Rule, len(s.rules))
@@ -74,6 +77,9 @@ func (s *Store) Clear() error {
 }
 
 func (s *Store) Match(req *http.Request) *Rule {
+	s.mu.Lock()
+	_ = s.load()
+	s.mu.Unlock()
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	for _, r := range s.rules {

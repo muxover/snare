@@ -22,11 +22,19 @@ func NewStore(maxCaptures int, persistDir string) *Store {
 	if maxCaptures <= 0 {
 		maxCaptures = defaultMaxCaptures
 	}
-	return &Store{
+	s := &Store{
 		captures: make([]*Capture, 0, maxCaptures),
 		max:      maxCaptures,
 		dir:      persistDir,
 	}
+	if persistDir != "" {
+		existing := s.AllFromDisk()
+		if len(existing) > maxCaptures {
+			existing = existing[len(existing)-maxCaptures:]
+		}
+		s.captures = existing
+	}
+	return s
 }
 
 func (s *Store) Add(c *Capture) {

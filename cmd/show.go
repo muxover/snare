@@ -53,6 +53,20 @@ func runShow(cmd *cobra.Command, args []string) error {
 		fmt.Println("Error:", c.Error)
 	}
 	fmt.Printf("\nDuration: %s\n", c.Duration)
+	if c.GRPC != nil && len(c.GRPC.Frames) > 0 {
+		fmt.Printf("\n=== gRPC — %s ===\n", c.GRPC.ServiceMethod)
+		for _, f := range c.GRPC.Frames {
+			dir := "→"
+			if f.Direction == "response" {
+				dir = "←"
+			}
+			preview := string(f.Data)
+			if len(preview) > 256 {
+				preview = preview[:256] + "…"
+			}
+			fmt.Printf("%s  %s\n", dir, preview)
+		}
+	}
 	if c.WebSocket != nil && len(c.WebSocket.Frames) > 0 {
 		fmt.Println("\n=== WebSocket frames ===")
 		for _, f := range c.WebSocket.Frames {

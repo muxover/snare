@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -22,12 +23,13 @@ var (
 	replayHeader []string
 	replayMatch  string
 	replayEdit   bool
+	replayProxy  string
 )
 
 var replayCmd = &cobra.Command{
 	Use:   "replay [id]",
 	Short: "Replay a captured request",
-	Long:  "Re-send captured requests directly (not through the proxy). Provide a capture ID, or use --match to replay all captures whose URL contains the given substring.",
+	Long:  "Re-send captured requests through the snare proxy so the replay is captured and inspectable. Provide a capture ID, or use --match to replay all captures whose URL contains the given substring.",
 	Args:  cobra.ArbitraryArgs,
 	RunE:  runReplay,
 }
@@ -38,6 +40,7 @@ func init() {
 	replayCmd.Flags().StringSliceVarP(&replayHeader, "header", "H", nil, "Add or override header (Key: Value); can be repeated")
 	replayCmd.Flags().StringVar(&replayMatch, "match", "", "Replay all captures whose URL contains this substring")
 	replayCmd.Flags().BoolVar(&replayEdit, "edit", false, "Open capture in $EDITOR before resending")
+	replayCmd.Flags().StringVar(&replayProxy, "proxy", "http://127.0.0.1:8888", "Proxy URL to route replay through (set to empty to skip capturing)")
 }
 
 func runReplay(cmd *cobra.Command, args []string) error {
@@ -166,7 +169,15 @@ func replayCaptureOnce(c *capture.Capture) error {
 				}
 			}
 		}
-		client := &http.Client{}
+		var transport http.RoundTripper
+		if replayProxy != "" {
+			proxyURL, err := url.Parse(replayProxy)
+			if err != nil {
+				return fmt.Errorf("invalid --proxy URL: %w", err)
+			}
+			transport = &http.Transport{Proxy: http.ProxyURL(proxyURL)}
+		}
+		client := &http.Client{Transport: transport}
 		resp, err := client.Do(req)
 		if err != nil {
 			return err
