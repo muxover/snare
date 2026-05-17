@@ -22,10 +22,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/muxover/snare/capture"
-	"github.com/muxover/snare/intercept"
-	"github.com/muxover/snare/mock"
-	"github.com/muxover/snare/proxy/cert"
+	"github.com/muxover/snare/v2/capture"
+	"github.com/muxover/snare/v2/intercept"
+	"github.com/muxover/snare/v2/mock"
+	"github.com/muxover/snare/v2/proxy/cert"
 )
 
 type Handler struct {

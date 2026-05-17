@@ -18,14 +18,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/muxover/snare/capture"
-	"github.com/muxover/snare/config"
-	"github.com/muxover/snare/intercept"
-	"github.com/muxover/snare/mock"
-	"github.com/muxover/snare/proxy"
-	"github.com/muxover/snare/proxy/cert"
-	sess "github.com/muxover/snare/session"
-	"github.com/muxover/snare/web"
+	"github.com/muxover/snare/v2/capture"
+	"github.com/muxover/snare/v2/config"
+	"github.com/muxover/snare/v2/intercept"
+	"github.com/muxover/snare/v2/mock"
+	"github.com/muxover/snare/v2/proxy"
+	"github.com/muxover/snare/v2/proxy/cert"
+	sess "github.com/muxover/snare/v2/session"
+	"github.com/muxover/snare/v2/web"
 	"github.com/spf13/cobra"
 )
 

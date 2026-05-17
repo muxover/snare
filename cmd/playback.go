@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/muxover/snare/capture"
+	"github.com/muxover/snare/v2/capture"
 	"github.com/spf13/cobra"
 )
 

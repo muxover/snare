@@ -3,9 +3,9 @@
 <div align="center">
 
 [![CI](https://github.com/muxover/snare/actions/workflows/ci.yml/badge.svg)](https://github.com/muxover/snare/actions/workflows/ci.yml)
-[![Go Reference](https://pkg.go.dev/badge/github.com/muxover/snare.svg)](https://pkg.go.dev/github.com/muxover/snare)
+[![Go Reference](https://pkg.go.dev/badge/github.com/muxover/snare/v2.svg)](https://pkg.go.dev/github.com/muxover/snare/v2)
 [![Go Report Card](https://goreportcard.com/badge/github.com/muxover/snare)](https://goreportcard.com/report/github.com/muxover/snare)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/muxover/snare)](https://github.com/muxover/snare/releases/latest)
 
 **Local HTTP/HTTPS proxy — capture, inspect, replay, and mock traffic.**
@@ -16,10 +16,12 @@
 
 Snare runs as a local proxy and records every HTTP and HTTPS request that passes through it. Each capture is a plain JSON file you can list, filter, search, diff, mock, intercept, and replay with a single command. Forward and reverse proxy in one binary.
 
+---
+
 ## Installation
 
 ```bash
-go install github.com/muxover/snare@latest
+go install github.com/muxover/snare/v2@latest
 ```
 
 Build from source:
@@ -29,6 +31,8 @@ git clone https://github.com/muxover/snare.git
 cd snare
 go build -o snare .
 ```
+
+---
 
 ## Quick Start
 
@@ -45,6 +49,8 @@ snare show <id>
 snare replay <id>
 ```
 
+---
+
 ## HTTPS MITM
 
 ```bash
@@ -55,6 +61,8 @@ snare serve
 
 `snare ca install` runs the right command per platform: `certutil -addstore Root` on Windows, `security add-trusted-cert` on macOS, `update-ca-certificates` on Linux.
 
+---
+
 ## Reverse Proxy
 
 ```bash
@@ -62,6 +70,8 @@ snare serve --mode reverse --target http://localhost:3000
 ```
 
 No proxy env vars needed. All traffic to `127.0.0.1:8888` is forwarded to the target and captured.
+
+---
 
 ## Commands
 
@@ -153,6 +163,8 @@ No proxy env vars needed. All traffic to `127.0.0.1:8888` is forwarded to the ta
 | `snare ca install --device android` | Push CA to Android device via ADB |
 | `snare ca install --device ios` | Serve CA for Safari download on iOS |
 
+---
+
 ## serve Flags
 
 ```
@@ -187,6 +199,8 @@ No proxy env vars needed. All traffic to `127.0.0.1:8888` is forwarded to the ta
 -v, --verbose           Debug logging
 ```
 
+---
+
 ## Config file
 
 Snare reads `~/.snare/config.yaml` on startup. All `snare serve` flags are supported:
@@ -205,6 +219,8 @@ plugins:
   - "jq . >> ~/snare-log.ndjson"
 ```
 
+---
+
 ## list / watch Flags
 
 ```
@@ -219,6 +235,8 @@ plugins:
 --interval  Poll interval (watch only, default: 500ms)
 ```
 
+---
+
 ## replay Flags
 
 ```
@@ -230,6 +248,8 @@ plugins:
     --proxy   Proxy URL to route replay through (default: http://127.0.0.1:8888; set to empty to bypass)
 ```
 
+---
+
 ## clear Flags
 
 ```
@@ -238,6 +258,8 @@ plugins:
 --url     Delete only captures whose URL contains this substring
 --host    Delete only captures for this host
 ```
+
+---
 
 ## grep Flags
 
@@ -248,12 +270,16 @@ plugins:
 --host       Limit to this host
 ```
 
+---
+
 ## export Flags
 
 ```
 -f, --format  Output format: json (default), har, postman, openapi
 -n, --last    Number of captures to export (default: 50)
 ```
+
+---
 
 ## openapi Flags
 
@@ -262,6 +288,8 @@ plugins:
     --title   API title (default: "snare captured API")
     --server  Override server URL (default: inferred from captures)
 ```
+
+---
 
 ## record Flags
 
@@ -275,12 +303,16 @@ plugins:
 -v, --verbose Debug logging
 ```
 
+---
+
 ## playback Flags
 
 ```
 -p, --port  Port to listen on (default: 8888)
 -b, --bind  Bind address (default: 127.0.0.1)
 ```
+
+---
 
 ## Environment
 
@@ -290,6 +322,8 @@ plugins:
 | `SNARE_CA` | `~/.snare` | CA certificate directory |
 | `SNARE_MOCKS` | `~/.snare/mocks.json` | Mock rules file |
 | `SNARE_INTERCEPT` | `~/.snare/intercept` | Intercept queue directory |
+
+---
 
 ## Examples
 
@@ -371,20 +405,26 @@ snare session end after-deploy
 snare session diff baseline after-deploy
 ```
 
+---
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
+---
+
 ## License
 
 Licensed under the [MIT](LICENSE) license.
+
+---
 
 ## Links
 
 - Repository: https://github.com/muxover/snare
 - Issues: https://github.com/muxover/snare/issues
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
-- Go Reference: https://pkg.go.dev/github.com/muxover/snare
+- Go Reference: https://pkg.go.dev/github.com/muxover/snare/v2
 
 ---
 

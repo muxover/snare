@@ -6,8 +6,8 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/muxover/snare/config"
-	"github.com/muxover/snare/intercept"
+	"github.com/muxover/snare/v2/config"
+	"github.com/muxover/snare/v2/intercept"
 	"github.com/spf13/cobra"
 )
 

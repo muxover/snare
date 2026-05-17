@@ -19,10 +19,10 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
-	"github.com/muxover/snare/capture"
-	"github.com/muxover/snare/intercept"
-	"github.com/muxover/snare/mock"
-	sess "github.com/muxover/snare/session"
+	"github.com/muxover/snare/v2/capture"
+	"github.com/muxover/snare/v2/intercept"
+	"github.com/muxover/snare/v2/mock"
+	sess "github.com/muxover/snare/v2/session"
 )
 
 type Server struct {

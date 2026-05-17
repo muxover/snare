@@ -1,4 +1,4 @@
-module github.com/muxover/snare
+module github.com/muxover/snare/v2
 
 go 1.25.0
 

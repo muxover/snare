@@ -2,11 +2,11 @@ package cmd
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/muxover/snare/capture"
-	"github.com/muxover/snare/config"
-	"github.com/muxover/snare/intercept"
-	"github.com/muxover/snare/mock"
-	"github.com/muxover/snare/tui"
+	"github.com/muxover/snare/v2/capture"
+	"github.com/muxover/snare/v2/config"
+	"github.com/muxover/snare/v2/intercept"
+	"github.com/muxover/snare/v2/mock"
+	"github.com/muxover/snare/v2/tui"
 	"github.com/spf13/cobra"
 )
 

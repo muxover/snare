@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/muxover/snare/capture"
-	"github.com/muxover/snare/intercept"
+	"github.com/muxover/snare/v2/capture"
+	"github.com/muxover/snare/v2/intercept"
 	"golang.org/x/net/http2"
 )
 

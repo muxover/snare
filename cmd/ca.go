@@ -11,8 +11,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/muxover/snare/config"
-	"github.com/muxover/snare/proxy/cert"
+	"github.com/muxover/snare/v2/config"
+	"github.com/muxover/snare/v2/proxy/cert"
 	"github.com/spf13/cobra"
 )
 

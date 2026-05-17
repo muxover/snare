@@ -11,8 +11,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/muxover/snare/capture"
-	"github.com/muxover/snare/config"
+	"github.com/muxover/snare/v2/capture"
+	"github.com/muxover/snare/v2/config"
 
 	"github.com/spf13/cobra"
 )

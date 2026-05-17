@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/muxover/snare/capture"
+	"github.com/muxover/snare/v2/capture"
 )
 
 var (

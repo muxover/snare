@@ -22,11 +22,11 @@ jobs:
 
       - name: Build
         run: |
-          GOOS=linux   GOARCH=amd64 go build -v -o snare-linux-amd64 .
-          GOOS=linux   GOARCH=arm64 go build -v -o snare-linux-arm64 .
-          GOOS=darwin  GOARCH=amd64 go build -v -o snare-darwin-amd64 .
-          GOOS=darwin  GOARCH=arm64 go build -v -o snare-darwin-arm64 .
-          GOOS=windows GOARCH=amd64 go build -v -o snare-windows-amd64.exe .
+          GOOS=linux   GOARCH=amd64 go build -ldflags "-s -w" -o snare-linux-amd64 .
+          GOOS=linux   GOARCH=arm64 go build -ldflags "-s -w" -o snare-linux-arm64 .
+          GOOS=darwin  GOARCH=amd64 go build -ldflags "-s -w" -o snare-darwin-amd64 .
+          GOOS=darwin  GOARCH=arm64 go build -ldflags "-s -w" -o snare-darwin-arm64 .
+          GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o snare-windows-amd64.exe .
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

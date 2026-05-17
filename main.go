@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/muxover/snare/cmd"
+	"github.com/muxover/snare/v2/cmd"
 	"os"
 )
 

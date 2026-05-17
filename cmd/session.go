@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/muxover/snare/capture"
-	"github.com/muxover/snare/config"
-	sess "github.com/muxover/snare/session"
+	"github.com/muxover/snare/v2/capture"
+	"github.com/muxover/snare/v2/config"
+	sess "github.com/muxover/snare/v2/session"
 	"github.com/spf13/cobra"
 )
 

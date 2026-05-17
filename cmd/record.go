@@ -12,10 +12,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/muxover/snare/capture"
-	"github.com/muxover/snare/config"
-	"github.com/muxover/snare/proxy"
-	"github.com/muxover/snare/proxy/cert"
+	"github.com/muxover/snare/v2/capture"
+	"github.com/muxover/snare/v2/config"
+	"github.com/muxover/snare/v2/proxy"
+	"github.com/muxover/snare/v2/proxy/cert"
 	"github.com/spf13/cobra"
 )
 

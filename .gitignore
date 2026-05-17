@@ -3,7 +3,7 @@
 Thumbs.db
 desktop.ini
 
-# IDE / editor (do not commit)
+# IDE / editor
 .vscode/
 .idea/
 .cursor/

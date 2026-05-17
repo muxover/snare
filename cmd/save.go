@@ -3,8 +3,8 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/muxover/snare/capture"
-	"github.com/muxover/snare/config"
+	"github.com/muxover/snare/v2/capture"
+	"github.com/muxover/snare/v2/config"
 	"os"
 
 	"github.com/spf13/cobra"
