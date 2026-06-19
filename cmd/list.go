@@ -13,14 +13,15 @@ import (
 )
 
 var (
-	listLast   int
-	listMethod string
-	listStatus int
-	listURL    string
-	listHost   string
-	listSince  string
-	listUntil  string
-	listBody   string
+	listLast      int
+	listMethod    string
+	listStatus    int
+	listURL       string
+	listHost      string
+	listSince     string
+	listUntil     string
+	listBody      string
+	listOperation string
 )
 
 var listCmd = &cobra.Command{
@@ -39,6 +40,7 @@ func init() {
 	listCmd.Flags().StringVar(&listSince, "since", "", "Include captures at or after this time (RFC3339 or 2006-01-02)")
 	listCmd.Flags().StringVar(&listUntil, "until", "", "Include captures at or before this time (RFC3339 or 2006-01-02)")
 	listCmd.Flags().StringVar(&listBody, "body", "", "Filter by substring in request or response body")
+	listCmd.Flags().StringVar(&listOperation, "operation", "", "Filter by GraphQL operation name")
 }
 
 func runList(cmd *cobra.Command, args []string) error {
@@ -57,8 +59,8 @@ func runList(cmd *cobra.Command, args []string) error {
 	store := capture.NewStore(0, config.StoreDir())
 
 	hasFilter := listMethod != "" || listStatus != 0 || listURL != "" || listHost != "" ||
-		listSince != "" || listUntil != "" || listBody != ""
-	scanAll := listSince != "" || listUntil != "" || listBody != ""
+		listSince != "" || listUntil != "" || listBody != "" || listOperation != ""
+	scanAll := listSince != "" || listUntil != "" || listBody != "" || listOperation != ""
 
 	var captures []*capture.Capture
 	if scanAll {
@@ -74,7 +76,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		captures = store.ListFromDisk(loadN)
 	}
 
-	captures = filterCaptures(captures, listMethod, listStatus, listURL, listHost, listBody, since, until)
+	captures = filterCaptures(captures, listMethod, listStatus, listURL, listHost, listBody, listOperation, since, until)
 	if listLast > 0 && len(captures) > listLast {
 		captures = captures[:listLast]
 	}
@@ -94,7 +96,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func filterCaptures(captures []*capture.Capture, method string, status int, urlSub, host, bodySub string, since, until time.Time) []*capture.Capture {
+func filterCaptures(captures []*capture.Capture, method string, status int, urlSub, host, bodySub, operation string, since, until time.Time) []*capture.Capture {
 	var out []*capture.Capture
 	for _, c := range captures {
 		if method != "" && c.Request.Method != method {
@@ -124,6 +126,11 @@ func filterCaptures(captures []*capture.Capture, method string, status int, urlS
 			inReq := strings.Contains(string(c.Request.Body), bodySub)
 			inResp := c.Response != nil && strings.Contains(string(c.Response.Body), bodySub)
 			if !inReq && !inResp {
+				continue
+			}
+		}
+		if operation != "" {
+			if c.GraphQL == nil || !strings.EqualFold(c.GraphQL.OperationName, operation) {
 				continue
 			}
 		}

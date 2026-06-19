@@ -51,6 +51,8 @@ func colorProto(proto string) string {
 	switch proto {
 	case "h2":
 		return colorBlue.Render(proto)
+	case "h3":
+		return colorMagenta.Render(proto)
 	case "ws":
 		return colorCyan.Render(proto)
 	default:

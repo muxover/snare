@@ -38,7 +38,7 @@ func init() {
 func runAssert(cmd *cobra.Command, args []string) error {
 	store := capture.NewStore(0, config.StoreDir())
 	captures := store.AllFromDisk()
-	matched := filterCaptures(captures, assertMethod, assertStatus, assertURL, "", assertBody, time.Time{}, time.Time{})
+	matched := filterCaptures(captures, assertMethod, assertStatus, assertURL, "", assertBody, "", time.Time{}, time.Time{})
 	n := len(matched)
 
 	conditions := buildAssertLabel()

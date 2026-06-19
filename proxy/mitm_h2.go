@@ -63,27 +63,49 @@ func (m *mitmH2Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	resp, err := m.transport.RoundTrip(outReq)
 	if err != nil {
-		m.parent.addCapture(&capture.Capture{ID: capID, Timestamp: start, Error: err.Error()})
+		m.parent.addCapture(&capture.Capture{ID: capID, Timestamp: start, Protocol: "h2", Error: err.Error()})
 		http.Error(rw, err.Error(), http.StatusBadGateway)
 		return
 	}
 	defer resp.Body.Close()
-	respBody, _ := io.ReadAll(resp.Body)
-	duration := time.Since(start)
 
+	resp.Header.Del("Alt-Svc")
+
+	duration := time.Since(start)
 	reqCaptureBody := decompressBody(bodyBuf, req.Header.Get("Content-Encoding"))
 	reqHeaders := req.Header.Clone()
 	if len(reqCaptureBody) != len(bodyBuf) {
 		reqHeaders.Del("Content-Encoding")
 		reqHeaders.Set("Content-Length", strconv.Itoa(len(reqCaptureBody)))
 	}
+
+	if isSSE(resp.Header) {
+		c := &capture.Capture{
+			ID:        capID,
+			Timestamp: start,
+			Protocol:  "h2",
+			Request: capture.RequestSnapshot{
+				Method:  req.Method,
+				URL:     req.URL.String(),
+				Headers: reqHeaders,
+				Body:    capture.BodyBytes(reqCaptureBody),
+			},
+			Duration: duration,
+		}
+		c.GraphQL = detectGraphQL(req.Header.Get("Content-Type"), reqCaptureBody)
+		m.parent.streamSSE(rw, resp, c)
+		return
+	}
+
+	respBody, _ := io.ReadAll(resp.Body)
 	captureBody := decompressBody(respBody, resp.Header.Get("Content-Encoding"))
 	respHeaders := resp.Header.Clone()
 	if len(captureBody) != len(respBody) {
 		respHeaders.Del("Content-Encoding")
 		respHeaders.Set("Content-Length", strconv.Itoa(len(captureBody)))
 	}
-	m.parent.addCapture(&capture.Capture{
+
+	c := &capture.Capture{
 		ID:        capID,
 		Timestamp: start,
 		Protocol:  "h2",
@@ -99,7 +121,16 @@ func (m *mitmH2Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			Body:       capture.BodyBytes(captureBody),
 		},
 		Duration: duration,
-	})
+	}
+	c.GraphQL = detectGraphQL(req.Header.Get("Content-Type"), reqCaptureBody)
+	if isGRPC(req.Header) || isGRPC(resp.Header) {
+		frames := append(parseGRPCFrames(reqCaptureBody, "request"), parseGRPCFrames(captureBody, "response")...)
+		if len(frames) > 0 {
+			c.GRPC = &capture.GRPCCapture{ServiceMethod: req.URL.Path, Frames: frames}
+			m.parent.decodeGRPC(c.GRPC, req.URL.Path, reqCaptureBody, captureBody)
+		}
+	}
+	m.parent.addCapture(c)
 
 	for k, v := range resp.Header {
 		for _, vv := range v {

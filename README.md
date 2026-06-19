@@ -4,7 +4,6 @@
 
 [![CI](https://github.com/muxover/snare/actions/workflows/ci.yml/badge.svg)](https://github.com/muxover/snare/actions/workflows/ci.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/muxover/snare/v2.svg)](https://pkg.go.dev/github.com/muxover/snare/v2)
-[![Go Report Card](https://goreportcard.com/badge/github.com/muxover/snare)](https://goreportcard.com/report/github.com/muxover/snare)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/muxover/snare)](https://github.com/muxover/snare/releases/latest)
 
@@ -81,7 +80,7 @@ No proxy env vars needed. All traffic to `127.0.0.1:8888` is forwarded to the ta
 |---------|-------------|
 | `snare list` | List captures with filters and colorized output |
 | `snare watch` | Tail new captures as they arrive |
-| `snare show <id>` | Full request/response detail; WebSocket frames when present |
+| `snare show <id>` | Full request/response detail; WebSocket frames, SSE frames, GraphQL fields, and decoded gRPC when present |
 | `snare diff <a> <b>` | Diff two captures |
 | `snare grep <pattern>` | Regex search across all capture bodies |
 | `snare clear` | Delete captures (all, or filtered by method/status/url/host) |
@@ -196,6 +195,8 @@ No proxy env vars needed. All traffic to `127.0.0.1:8888` is forwarded to the ta
     --web               Start web dashboard
     --web-port          Port for web dashboard (default: 8080)
     --no-config         Ignore ~/.snare/config.yaml
+    --proto             Protobuf definition file for gRPC decoding (repeatable)
+    --no-h3             Disable HTTP/3 QUIC server in reverse proxy mode
 -v, --verbose           Debug logging
 ```
 
@@ -224,15 +225,16 @@ plugins:
 ## list / watch Flags
 
 ```
---method    HTTP method
---status    Response status code
---url       URL substring
---host      Host
---body      Substring in request or response body
---since     Start timestamp (RFC3339)
---until     End timestamp (RFC3339)
---limit     Max results (list only)
---interval  Poll interval (watch only, default: 500ms)
+--method      HTTP method
+--status      Response status code
+--url         URL substring
+--host        Host
+--body        Substring in request or response body
+--operation   GraphQL operation name
+--since       Start timestamp (RFC3339)
+--until       End timestamp (RFC3339)
+--limit       Max results (list only)
+--interval    Poll interval (watch only, default: 500ms)
 ```
 
 ---
@@ -394,6 +396,16 @@ snare serve --plugin "jq -c . >> ~/captures.ndjson"
 
 # Web dashboard
 snare serve --web
+
+# Decode gRPC traffic with a .proto file
+snare serve --proto path/to/service.proto
+
+# Filter captures by GraphQL operation name
+snare list --operation GetUser
+snare watch --operation CreateOrder
+
+# Reverse proxy with HTTP/3 disabled
+snare serve --mode reverse --target http://localhost:3000 --no-h3
 
 # Diff two test runs
 snare session start baseline

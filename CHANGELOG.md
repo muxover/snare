@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-06-20
+
+### Added
+
+- `snare serve --proto <file.proto>` — provide a `.proto` definition file; gRPC frames for matching service methods are decoded into human-readable JSON (`decoded_request` / `decoded_response` fields). Falls back to raw bytes if no match or decode fails.
+- GraphQL detection: requests with `Content-Type: application/json` containing a `query` key, or `Content-Type: application/graphql`, are parsed automatically. `operation_name`, `operation_type`, and `variables` are stored under `graphql` in the capture JSON.
+- `snare list --operation <name>` and `snare watch --operation <name>` — filter by GraphQL operation name.
+- SSE frame capture: responses with `Content-Type: text/event-stream` are streamed to the client while each parsed event is stored under `sse.frames` (`id`, `event`, `data`, `timestamp`). HAR export includes `_sseEvents` on SSE entries.
+- HTTP/3 (QUIC) server in reverse proxy mode: starts a QUIC listener on the same port as the TCP listener using the MITM CA cert. Captures include `protocol: "h3"`. Disable with `--no-h3`.
+- `Alt-Svc` headers are stripped from all proxied responses in forward proxy mode to prevent clients from directly upgrading to HTTP/3 outside the proxy.
+- `snare show` prints GraphQL and SSE sections when present.
+- TUI detail view shows GraphQL and SSE frame sections.
+- Web dashboard capture list shows protocol badge (h2/h3) and GraphQL operation name on each row. Detail panel shows GraphQL fields, decoded gRPC JSON, and SSE frames.
+
 ## [2.0.0] - 2026-05-17
 
 ### Added
@@ -166,7 +180,8 @@ First release.
 - Body decompression (gzip, deflate, brotli) for readable captures.
 - Config via `SNARE_STORE`, `SNARE_CA` and serve flags (port, bind, max-captures).
 
-[Unreleased]: https://github.com/muxover/snare/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/muxover/snare/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/muxover/snare/releases/tag/v2.1.0
 [2.0.0]: https://github.com/muxover/snare/releases/tag/v2.0.0
 [1.9.0]: https://github.com/muxover/snare/releases/tag/v1.9.0
 [1.8.0]: https://github.com/muxover/snare/releases/tag/v1.8.0

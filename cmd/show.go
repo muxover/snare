@@ -53,6 +53,18 @@ func runShow(cmd *cobra.Command, args []string) error {
 		fmt.Println("Error:", c.Error)
 	}
 	fmt.Printf("\nDuration: %s\n", c.Duration)
+	if c.GraphQL != nil {
+		fmt.Println("\n=== GraphQL ===")
+		if c.GraphQL.OperationName != "" {
+			fmt.Printf("Operation:  %s\n", c.GraphQL.OperationName)
+		}
+		if c.GraphQL.OperationType != "" {
+			fmt.Printf("Type:       %s\n", c.GraphQL.OperationType)
+		}
+		if len(c.GraphQL.Variables) > 0 && string(c.GraphQL.Variables) != "null" {
+			fmt.Printf("Variables:  %s\n", string(c.GraphQL.Variables))
+		}
+	}
 	if c.GRPC != nil && len(c.GRPC.Frames) > 0 {
 		fmt.Printf("\n=== gRPC — %s ===\n", c.GRPC.ServiceMethod)
 		for _, f := range c.GRPC.Frames {
@@ -60,11 +72,33 @@ func runShow(cmd *cobra.Command, args []string) error {
 			if f.Direction == "response" {
 				dir = "←"
 			}
+			if f.Direction == "request" && len(c.GRPC.DecodedRequest) > 0 {
+				fmt.Printf("%s  %s\n", dir, string(c.GRPC.DecodedRequest))
+				continue
+			}
+			if f.Direction == "response" && len(c.GRPC.DecodedResponse) > 0 {
+				fmt.Printf("%s  %s\n", dir, string(c.GRPC.DecodedResponse))
+				continue
+			}
 			preview := string(f.Data)
 			if len(preview) > 256 {
 				preview = preview[:256] + "…"
 			}
 			fmt.Printf("%s  %s\n", dir, preview)
+		}
+	}
+	if c.SSE != nil && len(c.SSE.Frames) > 0 {
+		fmt.Println("\n=== SSE frames ===")
+		for _, f := range c.SSE.Frames {
+			name := f.Event
+			if name == "" {
+				name = "message"
+			}
+			fmt.Printf("%s  %-12s  %s\n",
+				f.Timestamp.Format("15:04:05.000"),
+				name,
+				strings.ReplaceAll(f.Data, "\n", "\\n"),
+			)
 		}
 	}
 	if c.WebSocket != nil && len(c.WebSocket.Frames) > 0 {

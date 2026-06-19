@@ -9,7 +9,7 @@
   --bg: #0d1117; --surface: #161b22; --border: #30363d;
   --text: #e6edf3; --muted: #7d8590; --accent: #58a6ff;
   --green: #3fb950; --yellow: #d29922; --red: #f85149;
-  --blue: #58a6ff; --purple: #a371f7;
+  --blue: #58a6ff; --purple: #a371f7; --cyan: #39d0d8;
   --font-mono: ui-monospace,'Cascadia Code','Fira Code','Consolas',monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -286,10 +286,12 @@ function renderList() {
     const s = c.response?.status_code;
     const m = c.request.method;
     const cls = c.id===activeId?' active':c.id===pinnedId?' pinned':'';
+    const proto = c.protocol && c.protocol!=='h1' ? `<span style="font-size:10px;color:var(--muted);margin-right:3px">${esc(c.protocol)}</span>` : '';
+    const gqlBadge = c.graphql ? `<span style="font-size:10px;color:var(--purple);margin-right:3px">${esc(c.graphql.operation_name||'gql')}</span>` : '';
     return `<div class="cap-row${cls}" onclick="select('${c.id}')">
       <span class="pill ${m}">${esc(m)}</span>
       <span class="st ${scls(s)}">${s||'—'}</span>
-      <span class="url-cell" title="${esc(c.request.url)}">${esc(urlPath(c.request.url))}</span>
+      ${proto}${gqlBadge}<span class="url-cell" title="${esc(c.request.url)}">${esc(urlPath(c.request.url))}</span>
       <span class="dur">${fmtDur(c.duration_ns)}</span>
     </div>`;
   }).join('');
@@ -341,8 +343,29 @@ function showDetail(c) {
       html+=`<div class="sec"><div class="sec-t">Response body</div><div class="code">${esc(body)}</div></div>`;
     }
   }
+  if (c.graphql) {
+    const gql = c.graphql;
+    const badge = gql.operation_type ? `<span class="pill" style="background:var(--purple);color:#fff;font-size:11px;margin-right:6px">${esc(gql.operation_type)}</span>` : '';
+    let rows = '';
+    if (gql.operation_name) rows+=`<tr><td style="color:var(--dim)">Operation</td><td>${esc(gql.operation_name)}</td></tr>`;
+    if (gql.variables && gql.variables!=='null') rows+=`<tr><td style="color:var(--dim);vertical-align:top">Variables</td><td><div class="code" style="max-height:120px">${esc(typeof gql.variables==='string'?gql.variables:JSON.stringify(gql.variables,null,2))}</div></td></tr>`;
+    html+=`<div class="sec"><div class="sec-t">${badge}GraphQL</div><table class="kv"><tbody>${rows}</tbody></table></div>`;
+  }
   if (c.grpc) {
-    html+=`<div class="sec"><div class="sec-t">gRPC — ${esc(c.grpc.method||'')}</div>${(c.grpc.frames||[]).map(f=>`<div class="frame-row"><span class="frame-dir">${f.direction==='request'?'→':'←'}</span><div style="flex:1"><div class="code" style="max-height:80px">${esc(f.data||'')}</div></div></div>`).join('')}</div>`;
+    const frames = (c.grpc.frames||[]).map(f=>{
+      const dir = f.direction==='request'?'→':'←';
+      const decoded = f.direction==='request' ? c.grpc.decoded_request : c.grpc.decoded_response;
+      const body = decoded ? (typeof decoded==='string'?decoded:JSON.stringify(decoded,null,2)) : (f.data||'');
+      return `<div class="frame-row"><span class="frame-dir">${dir}</span><div style="flex:1"><div class="code" style="max-height:80px">${esc(body)}</div></div></div>`;
+    }).join('');
+    html+=`<div class="sec"><div class="sec-t">gRPC — ${esc(c.grpc.method||'')}</div>${frames}</div>`;
+  }
+  if (c.sse?.frames?.length) {
+    const rows = c.sse.frames.slice(0,50).map(f=>{
+      const name = f.event||'message';
+      return `<div class="frame-row"><span class="frame-dir" style="min-width:80px;color:var(--cyan)">${esc(name)}</span><div style="flex:1"><div class="code" style="max-height:60px">${esc(f.data||'')}</div></div></div>`;
+    }).join('');
+    html+=`<div class="sec"><div class="sec-t">SSE frames (${c.sse.frames.length})</div>${rows}</div>`;
   }
   if (c.websocket?.frames?.length) {
     html+=`<div class="sec"><div class="sec-t">WebSocket frames (${c.websocket.frames.length})</div>${c.websocket.frames.slice(0,30).map(f=>`<div class="frame-row"><span class="frame-dir">${f.direction==='s2c'?'←':'→'}</span><div style="flex:1"><div class="code" style="max-height:60px">${esc(f.payload||'')}</div></div></div>`).join('')}</div>`;

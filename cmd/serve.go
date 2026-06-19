@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -59,6 +60,8 @@ var (
 	serveWeb              bool
 	serveWebPort          string
 	serveNoConfig         bool
+	serveProtoFiles       []string
+	serveNoH3             bool
 )
 
 var serveCmd = &cobra.Command{
@@ -98,6 +101,8 @@ func init() {
 	serveCmd.Flags().BoolVar(&serveWeb, "web", false, "Start web dashboard")
 	serveCmd.Flags().StringVar(&serveWebPort, "web-port", "8080", "Port for web dashboard (default: 8080)")
 	serveCmd.Flags().BoolVar(&serveNoConfig, "no-config", false, "Ignore ~/.snare/config.yaml")
+	serveCmd.Flags().StringArrayVar(&serveProtoFiles, "proto", nil, "Protobuf definition file for gRPC decoding; decoded fields shown instead of raw bytes (repeatable)")
+	serveCmd.Flags().BoolVar(&serveNoH3, "no-h3", false, "Disable HTTP/3 (QUIC) server in reverse proxy mode")
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
@@ -220,6 +225,16 @@ func runServe(cmd *cobra.Command, args []string) error {
 		onCapture = baseOnCapture
 	}
 
+	var protoDecoder *proxy.ProtoDecoder
+	if len(serveProtoFiles) > 0 {
+		pd, pdErr := proxy.NewProtoDecoder(serveProtoFiles)
+		if pdErr != nil {
+			log.Warn("proto decode disabled", "err", pdErr)
+		} else {
+			protoDecoder = pd
+		}
+	}
+
 	handler := &proxy.Handler{
 		Transport:        transport,
 		Store:            store,
@@ -244,6 +259,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		ChaosRate:        serveChaos,
 		Shadows:          shadows,
 		Plugins:          servePlugins,
+		ProtoDecoder:     protoDecoder,
 	}
 
 	addr := serveBind + ":" + servePort
@@ -254,6 +270,24 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	if serveMode == "reverse" {
 		log.Info("reverse proxy listening", "addr", addr, "target", serveTarget)
+		if !serveNoH3 && hostCerts != nil && reverseTarget != nil {
+			hostname := reverseTarget.Hostname()
+			if hostname == "" {
+				hostname = "localhost"
+			}
+			rawCert, privKey, certErr := hostCerts.GetCertificate(hostname)
+			if certErr == nil {
+				tlsCfg := &tls.Config{
+					Certificates: []tls.Certificate{{
+						Certificate: [][]byte{rawCert.Raw},
+						PrivateKey:  privKey,
+					}},
+				}
+				srv.StartH3(handler, tlsCfg, log)
+			} else {
+				log.Warn("H3: cert generation failed, HTTP/3 disabled", "err", certErr)
+			}
+		}
 	} else {
 		log.Info("proxy listening", "addr", addr, "mitm", mitmEnable)
 		log.Info("set HTTP_PROXY and HTTPS_PROXY to http://" + addr)

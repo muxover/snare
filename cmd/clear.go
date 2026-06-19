@@ -43,7 +43,7 @@ func runClear(cmd *cobra.Command, args []string) error {
 	}
 
 	all := store.AllFromDisk()
-	matches := filterCaptures(all, clearMethod, clearStatus, clearURL, clearHost, "", time.Time{}, time.Time{})
+	matches := filterCaptures(all, clearMethod, clearStatus, clearURL, clearHost, "", "", time.Time{}, time.Time{})
 	if len(matches) == 0 {
 		fmt.Println("No captures matched the filter.")
 		return nil

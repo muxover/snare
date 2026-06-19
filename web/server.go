@@ -409,6 +409,18 @@ func buildWebHAR(captures []*capture.Capture) map[string]any {
 				"bodySize": len(c.Response.Body),
 			}
 		}
+		if c.SSE != nil && len(c.SSE.Frames) > 0 {
+			events := make([]map[string]any, 0, len(c.SSE.Frames))
+			for _, f := range c.SSE.Frames {
+				events = append(events, map[string]any{
+					"time":  f.Timestamp.Format(time.RFC3339Nano),
+					"id":    f.ID,
+					"event": f.Event,
+					"data":  f.Data,
+				})
+			}
+			ent["_sseEvents"] = events
+		}
 		entries = append(entries, ent)
 	}
 	return map[string]any{

@@ -44,11 +44,32 @@ type Capture struct {
 	Error     string            `json:"error,omitempty"`
 	WebSocket *WebSocketCapture `json:"websocket,omitempty"`
 	GRPC      *GRPCCapture      `json:"grpc,omitempty"`
+	SSE       *SSECapture       `json:"sse,omitempty"`
+	GraphQL   *GraphQLCapture   `json:"graphql,omitempty"`
 }
 
 type GRPCCapture struct {
-	ServiceMethod string      `json:"method,omitempty"`
-	Frames        []GRPCFrame `json:"frames,omitempty"`
+	ServiceMethod   string          `json:"method,omitempty"`
+	Frames          []GRPCFrame     `json:"frames,omitempty"`
+	DecodedRequest  json.RawMessage `json:"decoded_request,omitempty"`
+	DecodedResponse json.RawMessage `json:"decoded_response,omitempty"`
+}
+
+type SSECapture struct {
+	Frames []SSEFrame `json:"frames,omitempty"`
+}
+
+type SSEFrame struct {
+	Timestamp time.Time `json:"timestamp"`
+	ID        string    `json:"id,omitempty"`
+	Event     string    `json:"event,omitempty"`
+	Data      string    `json:"data"`
+}
+
+type GraphQLCapture struct {
+	OperationName string          `json:"operation_name,omitempty"`
+	OperationType string          `json:"operation_type,omitempty"`
+	Variables     json.RawMessage `json:"variables,omitempty"`
 }
 
 type GRPCFrame struct {

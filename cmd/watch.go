@@ -14,12 +14,13 @@ import (
 )
 
 var (
-	watchPoll   time.Duration
-	watchMethod string
-	watchStatus int
-	watchURL    string
-	watchHost   string
-	watchBody   string
+	watchPoll      time.Duration
+	watchMethod    string
+	watchStatus    int
+	watchURL       string
+	watchHost      string
+	watchBody      string
+	watchOperation string
 )
 
 var watchCmd = &cobra.Command{
@@ -36,6 +37,7 @@ func init() {
 	watchCmd.Flags().StringVar(&watchURL, "url", "", "Filter by URL substring")
 	watchCmd.Flags().StringVar(&watchHost, "host", "", "Filter by host")
 	watchCmd.Flags().StringVar(&watchBody, "body", "", "Filter by substring in request or response body")
+	watchCmd.Flags().StringVar(&watchOperation, "operation", "", "Filter by GraphQL operation name")
 }
 
 const minWatchInterval = 100 * time.Millisecond
@@ -78,7 +80,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 			sort.Slice(fresh, func(i, j int) bool {
 				return fresh[i].Timestamp.Before(fresh[j].Timestamp)
 			})
-			filtered := filterCaptures(fresh, watchMethod, watchStatus, watchURL, watchHost, watchBody, time.Time{}, time.Time{})
+			filtered := filterCaptures(fresh, watchMethod, watchStatus, watchURL, watchHost, watchBody, watchOperation, time.Time{}, time.Time{})
 			for _, c := range filtered {
 				printCaptureLine(c)
 			}

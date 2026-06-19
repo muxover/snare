@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"math/rand"
@@ -52,6 +53,7 @@ type Handler struct {
 	ChaosRate        float64
 	Shadows          []*url.URL
 	Plugins          []string
+	ProtoDecoder     *ProtoDecoder
 }
 
 type HostRewrite struct {
@@ -153,6 +155,17 @@ func parseGRPCFrames(body []byte, direction string) []capture.GRPCFrame {
 		body = body[msgLen:]
 	}
 	return frames
+}
+
+func reqProto(req *http.Request) string {
+	switch req.ProtoMajor {
+	case 3:
+		return "h3"
+	case 2:
+		return "h2"
+	default:
+		return "h1"
+	}
 }
 
 func (h *Handler) isIgnored(urlStr string) bool {
@@ -277,7 +290,7 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 		h.addCapture(&capture.Capture{
 			ID:        capID,
 			Timestamp: start,
-			Protocol:  "h1",
+			Protocol:  reqProto(req),
 			Request: capture.RequestSnapshot{
 				Method:  req.Method,
 				URL:     req.URL.String(),
@@ -293,6 +306,39 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 	defer resp.Body.Close()
 
+	resp.Header.Del("Alt-Svc")
+
+	reqCaptureBody := decompressBody(bodyBuf, req.Header.Get("Content-Encoding"))
+	reqHeaders := req.Header.Clone()
+	if len(reqCaptureBody) != len(bodyBuf) {
+		reqHeaders.Del("Content-Encoding")
+		reqHeaders.Set("Content-Length", strconv.Itoa(len(reqCaptureBody)))
+	}
+
+	if !ignored && isSSE(resp.Header) {
+		c := &capture.Capture{
+			ID:        capID,
+			Timestamp: start,
+			Protocol:  reqProto(req),
+			Request: capture.RequestSnapshot{
+				Method:  req.Method,
+				URL:     outReq.URL.String(),
+				Headers: reqHeaders,
+				Body:    capture.BodyBytes(h.capSlice(reqCaptureBody)),
+			},
+			Duration: duration,
+		}
+		c.GraphQL = detectGraphQL(req.Header.Get("Content-Type"), reqCaptureBody)
+		if len(h.Shadows) > 0 {
+			go h.fireShadows(req.Method, outReq.URL.String(), req.Header, bodyBuf)
+		}
+		if h.Delay > 0 {
+			time.Sleep(h.Delay)
+		}
+		h.streamSSE(rw, resp, c)
+		return
+	}
+
 	respBody, _ := io.ReadAll(resp.Body)
 	if len(h.BodyRewrites) > 0 {
 		respBody = h.applyBodyRewrites(respBody)
@@ -303,18 +349,12 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 		respHeaders.Del("Content-Encoding")
 		respHeaders.Set("Content-Length", strconv.Itoa(len(captureBody)))
 	}
-	reqCaptureBody := decompressBody(bodyBuf, req.Header.Get("Content-Encoding"))
-	reqHeaders := req.Header.Clone()
-	if len(reqCaptureBody) != len(bodyBuf) {
-		reqHeaders.Del("Content-Encoding")
-		reqHeaders.Set("Content-Length", strconv.Itoa(len(reqCaptureBody)))
-	}
 
 	if !ignored {
 		c := &capture.Capture{
 			ID:        capID,
 			Timestamp: start,
-			Protocol:  "h1",
+			Protocol:  reqProto(req),
 			Request: capture.RequestSnapshot{
 				Method:  req.Method,
 				URL:     outReq.URL.String(),
@@ -328,10 +368,12 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 			},
 			Duration: duration,
 		}
+		c.GraphQL = detectGraphQL(req.Header.Get("Content-Type"), reqCaptureBody)
 		if isGRPC(outReq.Header) || isGRPC(resp.Header) {
 			frames := append(parseGRPCFrames(reqCaptureBody, "request"), parseGRPCFrames(captureBody, "response")...)
 			if len(frames) > 0 {
 				c.GRPC = &capture.GRPCCapture{ServiceMethod: outReq.URL.Path, Frames: frames}
+				h.decodeGRPC(c.GRPC, outReq.URL.Path, reqCaptureBody, captureBody)
 			}
 		}
 		h.addCapture(c)
@@ -341,7 +383,6 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 	if len(h.Shadows) > 0 {
 		go h.fireShadows(req.Method, outReq.URL.String(), req.Header, bodyBuf)
 	}
-
 	if h.Delay > 0 {
 		time.Sleep(h.Delay)
 	}
@@ -395,7 +436,7 @@ func (h *Handler) serveReverse(rw http.ResponseWriter, req *http.Request) {
 	duration := time.Since(start)
 	if err != nil {
 		if !ignored {
-			h.addCapture(&capture.Capture{ID: capID, Timestamp: start, Protocol: "h1",
+			h.addCapture(&capture.Capture{ID: capID, Timestamp: start, Protocol: reqProto(req),
 				Request:  capture.RequestSnapshot{Method: req.Method, URL: outURL.String(), Headers: req.Header.Clone()},
 				Duration: duration, Error: err.Error(),
 			})
@@ -404,6 +445,39 @@ func (h *Handler) serveReverse(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer resp.Body.Close()
+
+	resp.Header.Del("Alt-Svc")
+
+	reqCaptureBody := decompressBody(bodyBuf, req.Header.Get("Content-Encoding"))
+	reqHeaders := req.Header.Clone()
+	if len(reqCaptureBody) != len(bodyBuf) {
+		reqHeaders.Del("Content-Encoding")
+		reqHeaders.Set("Content-Length", strconv.Itoa(len(reqCaptureBody)))
+	}
+
+	if !ignored && isSSE(resp.Header) {
+		c := &capture.Capture{
+			ID:        capID,
+			Timestamp: start,
+			Protocol:  reqProto(req),
+			Request: capture.RequestSnapshot{
+				Method:  req.Method,
+				URL:     outURL.String(),
+				Headers: reqHeaders,
+				Body:    capture.BodyBytes(h.capSlice(reqCaptureBody)),
+			},
+			Duration: duration,
+		}
+		c.GraphQL = detectGraphQL(req.Header.Get("Content-Type"), reqCaptureBody)
+		if len(h.Shadows) > 0 {
+			go h.fireShadows(req.Method, outURL.String(), req.Header, bodyBuf)
+		}
+		if h.Delay > 0 {
+			time.Sleep(h.Delay)
+		}
+		h.streamSSE(rw, resp, c)
+		return
+	}
 
 	respBody, _ := io.ReadAll(resp.Body)
 	if len(h.BodyRewrites) > 0 {
@@ -417,15 +491,15 @@ func (h *Handler) serveReverse(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	if !ignored {
-		h.addCapture(&capture.Capture{
+		c := &capture.Capture{
 			ID:        capID,
 			Timestamp: start,
-			Protocol:  "h1",
+			Protocol:  reqProto(req),
 			Request: capture.RequestSnapshot{
 				Method:  req.Method,
 				URL:     outURL.String(),
-				Headers: req.Header.Clone(),
-				Body:    capture.BodyBytes(h.capSlice(decompressBody(bodyBuf, req.Header.Get("Content-Encoding")))),
+				Headers: reqHeaders,
+				Body:    capture.BodyBytes(h.capSlice(reqCaptureBody)),
 			},
 			Response: &capture.ResponseSnapshot{
 				StatusCode: resp.StatusCode,
@@ -433,14 +507,22 @@ func (h *Handler) serveReverse(rw http.ResponseWriter, req *http.Request) {
 				Body:       capture.BodyBytes(h.capSlice(captureBody)),
 			},
 			Duration: duration,
-		})
+		}
+		c.GraphQL = detectGraphQL(req.Header.Get("Content-Type"), reqCaptureBody)
+		if isGRPC(outReq.Header) || isGRPC(resp.Header) {
+			frames := append(parseGRPCFrames(reqCaptureBody, "request"), parseGRPCFrames(captureBody, "response")...)
+			if len(frames) > 0 {
+				c.GRPC = &capture.GRPCCapture{ServiceMethod: outReq.URL.Path, Frames: frames}
+				h.decodeGRPC(c.GRPC, outReq.URL.Path, reqCaptureBody, captureBody)
+			}
+		}
+		h.addCapture(c)
 		h.Log.Info("captured", "method", req.Method, "url", outURL.String(), "status", resp.StatusCode, "id", capID[:8])
 	}
 
 	if len(h.Shadows) > 0 {
 		go h.fireShadows(req.Method, outURL.String(), req.Header, bodyBuf)
 	}
-
 	if h.Delay > 0 {
 		time.Sleep(h.Delay)
 	}
@@ -715,21 +797,59 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 			}
 			return
 		}
+		duration := time.Since(start)
+
+		resp.Header.Del("Alt-Svc")
+
+		reqCaptureBody := decompressBody(bodyBuf, req.Header.Get("Content-Encoding"))
+		reqHeaders := req.Header.Clone()
+		if len(reqCaptureBody) != len(bodyBuf) {
+			reqHeaders.Del("Content-Encoding")
+			reqHeaders.Set("Content-Length", strconv.Itoa(len(reqCaptureBody)))
+		}
+
+		if !ignored && isSSE(resp.Header) {
+			c := &capture.Capture{
+				ID:        capID,
+				Timestamp: start,
+				Protocol:  "h1",
+				Request: capture.RequestSnapshot{
+					Method:  req.Method,
+					URL:     req.URL.String(),
+					Headers: reqHeaders,
+					Body:    capture.BodyBytes(h.capSlice(reqCaptureBody)),
+				},
+				Duration: duration,
+			}
+			c.GraphQL = detectGraphQL(req.Header.Get("Content-Type"), reqCaptureBody)
+			fmt.Fprintf(clientConn, "HTTP/1.1 %d %s\r\n", resp.StatusCode, http.StatusText(resp.StatusCode))
+			for k, v := range resp.Header {
+				for _, vv := range v {
+					fmt.Fprintf(clientConn, "%s: %s\r\n", k, vv)
+				}
+			}
+			fmt.Fprintf(clientConn, "\r\n")
+			frames := parseSSEStream(resp.Body, func(line string) bool {
+				_, err := fmt.Fprintf(clientConn, "%s\n", line)
+				return err == nil
+			})
+			resp.Body.Close()
+			if len(frames) > 0 {
+				c.SSE = &capture.SSECapture{Frames: frames}
+			}
+			h.addCapture(c)
+			h.Log.Info("captured (sse)", "method", req.Method, "url", req.URL.String(), "id", capID[:8])
+			return
+		}
+
 		respBody, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		duration := time.Since(start)
 
 		if len(h.BodyRewrites) > 0 {
 			respBody = h.applyBodyRewrites(respBody)
 		}
 
 		if !ignored {
-			reqCaptureBody := decompressBody(bodyBuf, req.Header.Get("Content-Encoding"))
-			reqHeaders := req.Header.Clone()
-			if len(reqCaptureBody) != len(bodyBuf) {
-				reqHeaders.Del("Content-Encoding")
-				reqHeaders.Set("Content-Length", strconv.Itoa(len(reqCaptureBody)))
-			}
 			captureBody := decompressBody(respBody, resp.Header.Get("Content-Encoding"))
 			respHeaders := resp.Header.Clone()
 			if len(captureBody) != len(respBody) {
@@ -757,6 +877,7 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 				},
 				Duration: duration,
 			}
+			c.GraphQL = detectGraphQL(req.Header.Get("Content-Type"), reqCaptureBody)
 			if proto == "ws" {
 				h.Log.Info("websocket", "url", req.URL.String(), "id", capID[:8])
 				resp.Body = io.NopCloser(bytes.NewReader(respBody))
@@ -765,6 +886,13 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 				_, _ = clientConn.Write(respBytes.Bytes())
 				h.relayWebSocketCapture(c, clientReader, clientConn, originReader, originConn)
 				return
+			}
+			if isGRPC(req.Header) || isGRPC(resp.Header) {
+				frames := append(parseGRPCFrames(reqCaptureBody, "request"), parseGRPCFrames(captureBody, "response")...)
+				if len(frames) > 0 {
+					c.GRPC = &capture.GRPCCapture{ServiceMethod: req.URL.Path, Frames: frames}
+					h.decodeGRPC(c.GRPC, req.URL.Path, reqCaptureBody, captureBody)
+				}
 			}
 			h.addCapture(c)
 			h.Log.Info("captured", "method", req.Method, "url", req.URL.String(), "status", resp.StatusCode, "id", capID[:8])
@@ -905,6 +1033,18 @@ func (h *Handler) applyHostRewrite(req *http.Request) {
 		req.URL.Host = targetHost
 		req.Host = targetHost
 		return
+	}
+}
+
+func (h *Handler) decodeGRPC(g *capture.GRPCCapture, method string, reqBody, respBody []byte) {
+	if h.ProtoDecoder == nil {
+		return
+	}
+	if decoded, err := h.ProtoDecoder.DecodeRequest(method, reqBody); err == nil {
+		g.DecodedRequest = decoded
+	}
+	if decoded, err := h.ProtoDecoder.DecodeResponse(method, respBody); err == nil {
+		g.DecodedResponse = decoded
 	}
 }
 

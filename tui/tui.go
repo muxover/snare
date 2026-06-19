@@ -1208,6 +1208,19 @@ func renderDetail(c *capture.Capture, width int) string {
 		}
 	}
 
+	if c.GraphQL != nil {
+		b.WriteString("\n" + styleSec.Render("── GraphQL ") + strings.Repeat("─", max(0, width-12)) + "\n")
+		if c.GraphQL.OperationName != "" {
+			b.WriteString(styleDim.Render("operation: ") + c.GraphQL.OperationName + "\n")
+		}
+		if c.GraphQL.OperationType != "" {
+			b.WriteString(styleDim.Render("type:      ") + c.GraphQL.OperationType + "\n")
+		}
+		if len(c.GraphQL.Variables) > 0 && string(c.GraphQL.Variables) != "null" {
+			b.WriteString(styleDim.Render("variables: ") + string(c.GraphQL.Variables) + "\n")
+		}
+	}
+
 	if c.GRPC != nil && len(c.GRPC.Frames) > 0 {
 		b.WriteString("\n" + styleSec.Render("── gRPC ") + strings.Repeat("─", max(0, width-9)) + "\n")
 		b.WriteString(styleDim.Render("method: "+c.GRPC.ServiceMethod) + "\n")
@@ -1216,11 +1229,35 @@ func renderDetail(c *capture.Capture, width int) string {
 			if f.Direction == "response" {
 				dir = "←"
 			}
-			data := string(f.Data)
+			var data string
+			if f.Direction == "request" && len(c.GRPC.DecodedRequest) > 0 {
+				data = string(c.GRPC.DecodedRequest)
+			} else if f.Direction == "response" && len(c.GRPC.DecodedResponse) > 0 {
+				data = string(c.GRPC.DecodedResponse)
+			} else {
+				data = string(f.Data)
+			}
 			if len(data) > 256 {
 				data = data[:256] + "…"
 			}
 			b.WriteString(styleWS.Render(dir) + " " + styleDim.Render(data) + "\n")
+		}
+	}
+
+	if c.SSE != nil && len(c.SSE.Frames) > 0 {
+		b.WriteString("\n" + styleSec.Render("── SSE frames ") + strings.Repeat("─", max(0, width-15)) + "\n")
+		for _, f := range c.SSE.Frames {
+			name := f.Event
+			if name == "" {
+				name = "message"
+			}
+			header := styleWS.Render(fmt.Sprintf("%s  %s", f.Timestamp.Format("15:04:05.000"), name))
+			b.WriteString(header + "\n")
+			preview := f.Data
+			if len(preview) > 256 {
+				preview = preview[:256] + "…"
+			}
+			b.WriteString(styleDim.Render(preview) + "\n")
 		}
 	}
 
