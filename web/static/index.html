@@ -13,55 +13,60 @@
   --font-mono: ui-monospace,'Cascadia Code','Fira Code','Consolas',monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:13px;display:flex;flex-direction:column;height:100vh;overflow:hidden}
-nav{display:flex;align-items:center;gap:10px;padding:0 14px;height:44px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
-.logo{font-size:14px;font-weight:700;letter-spacing:.5px}
-.dot{width:7px;height:7px;border-radius:50%;background:var(--muted);transition:background .3s}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:13px;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+nav{display:flex;align-items:center;gap:8px;padding:0 12px;height:44px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;min-width:0}
+.logo{font-size:14px;font-weight:700;letter-spacing:.5px;white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted);transition:background .3s;flex-shrink:0}
 .dot.on{background:var(--green)}
-#live-lbl{font-size:11px;color:var(--muted)}
-.nav-right{margin-left:auto;display:flex;align-items:center;gap:8px}
-#nav-count{font-size:11px;color:var(--muted)}
-.tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;padding:0 4px}
-.tab{padding:10px 16px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+#live-lbl{font-size:11px;color:var(--muted);white-space:nowrap}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:6px;flex-shrink:0}
+#nav-count{font-size:11px;color:var(--muted);white-space:nowrap}
+.tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;padding:0 4px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar{display:none}
+.tab{padding:10px 14px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;font-size:13px}
 .tab.active{color:var(--text);border-bottom-color:var(--accent)}
-.layout{display:flex;flex:1;overflow:hidden}
-.sidebar{width:400px;min-width:260px;display:flex;flex-direction:column;border-right:1px solid var(--border);flex-shrink:0}
+.layout{display:flex;flex:1;overflow:hidden;min-height:0}
+.sidebar{width:400px;min-width:240px;display:flex;flex-direction:column;border-right:1px solid var(--border);flex-shrink:0}
 .filters{display:flex;gap:5px;padding:7px 8px;border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap}
-.filters input{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:4px 7px;border-radius:4px;font-size:12px;font-family:inherit}
+.filters input{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 7px;border-radius:4px;font-size:12px;font-family:inherit;min-width:0}
 .filters input::placeholder{color:var(--muted)}
-.btn{padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;border:1px solid var(--border);color:var(--text);background:var(--surface);white-space:nowrap}
+.btn{padding:5px 10px;border-radius:4px;cursor:pointer;font-size:12px;border:1px solid var(--border);color:var(--text);background:var(--surface);white-space:nowrap;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .btn:hover{background:var(--border)}
+.btn:active{opacity:.8}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#0d1117;font-weight:600}
 .btn.primary:hover{filter:brightness(1.1)}
 .btn.danger{border-color:var(--red);color:var(--red)}
 .btn.danger:hover{background:rgba(248,81,73,.1)}
 .btn.warn{border-color:var(--yellow);color:var(--yellow)}
 .btn.warn:hover{background:rgba(210,153,34,.1)}
-.cap-list{overflow-y:auto;flex:1}
-.cap-row{display:flex;align-items:center;gap:7px;padding:6px 8px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none}
+.cap-list{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
+.cap-row{display:flex;align-items:center;gap:6px;padding:8px 8px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;min-width:0}
 .cap-row:hover{background:var(--surface)}
+.cap-row:active{background:var(--surface)}
 .cap-row.active{background:rgba(88,166,255,.08);border-left:2px solid var(--accent);padding-left:6px}
 .cap-row.pinned{background:rgba(163,113,247,.08);border-left:2px solid var(--purple);padding-left:6px}
-.pill{font-family:var(--font-mono);font-size:10px;font-weight:600;padding:2px 5px;border-radius:3px;background:rgba(255,255,255,.07);min-width:38px;text-align:center}
-.st{font-family:var(--font-mono);font-size:11px;min-width:28px;text-align:right}
-.url-cell{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:12px}
-.dur{color:var(--muted);font-size:11px;white-space:nowrap}
+.pill{font-family:var(--font-mono);font-size:10px;font-weight:600;padding:2px 5px;border-radius:3px;background:rgba(255,255,255,.07);min-width:36px;text-align:center;flex-shrink:0}
+.st{font-family:var(--font-mono);font-size:11px;min-width:28px;text-align:right;flex-shrink:0}
+.url-cell{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:12px;min-width:0}
+.dur{color:var(--muted);font-size:11px;white-space:nowrap;flex-shrink:0}
 .GET{color:var(--green)}.POST{color:var(--blue)}.PUT{color:var(--yellow)}.DELETE{color:var(--red)}.PATCH{color:var(--purple)}
 .s2{color:var(--green)}.s3{color:var(--blue)}.s4{color:var(--yellow)}.s5{color:var(--red)}
-.main{flex:1;overflow-y:auto;display:flex;flex-direction:column}
-.empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px}
+.main{flex:1;overflow-y:auto;display:flex;flex-direction:column;-webkit-overflow-scrolling:touch;min-width:0}
+.empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px;text-align:center;padding:20px}
 .detail{padding:14px}
-.dbar{display:flex;align-items:center;gap:8px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);flex-wrap:wrap}
-.durl{flex:1;font-family:var(--font-mono);font-size:12px;word-break:break-all}
+.back-btn{display:none;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.dbar{display:flex;align-items:center;gap:6px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.durl{flex:1;min-width:0;font-family:var(--font-mono);font-size:12px;word-break:break-all}
 .sec{margin-bottom:14px}
 .sec-t{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;margin-bottom:7px}
+.kv-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .kv{width:100%;border-collapse:collapse}
-.kv td{padding:3px 6px;font-family:var(--font-mono);font-size:11px;border-bottom:1px solid rgba(48,54,61,.5);vertical-align:top}
+.kv td{padding:4px 6px;font-family:var(--font-mono);font-size:11px;border-bottom:1px solid rgba(48,54,61,.5);vertical-align:top}
 .kv td:first-child{color:var(--muted);white-space:nowrap;padding-right:10px}
-.code{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:10px 12px;font-family:var(--font-mono);font-size:12px;white-space:pre-wrap;word-break:break-all;max-height:260px;overflow-y:auto;line-height:1.5}
+.code{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:10px 12px;font-family:var(--font-mono);font-size:12px;white-space:pre-wrap;word-break:break-all;max-height:260px;overflow-y:auto;line-height:1.5;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .frame-row{display:flex;gap:8px;margin-bottom:4px;align-items:flex-start}
-.frame-dir{font-size:11px;color:var(--muted);min-width:18px;padding-top:2px}
-.mocks-pane{padding:14px;overflow-y:auto;flex:1}
+.frame-dir{font-size:11px;color:var(--muted);min-width:18px;padding-top:2px;flex-shrink:0}
+.mocks-pane{padding:14px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
 .form-box{border:1px solid var(--border);border-radius:5px;padding:13px;background:var(--surface);margin-bottom:14px}
 .form-box h3{font-size:13px;font-weight:600;margin-bottom:11px}
 .fg4{display:grid;grid-template-columns:80px 1fr 70px 160px;gap:7px;margin-bottom:7px}
@@ -70,38 +75,75 @@ nav{display:flex;align-items:center;gap:10px;padding:0 14px;height:44px;backgrou
 .ff input,.ff textarea{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 7px;border-radius:4px;font-size:12px;font-family:inherit}
 .ff textarea{font-family:var(--font-mono);resize:vertical}
 .mock-item{display:flex;align-items:center;gap:8px;padding:9px 11px;border:1px solid var(--border);border-radius:4px;margin-bottom:7px;background:var(--surface)}
-.mock-meta{flex:1}
+.mock-meta{flex:1;min-width:0}
 .mock-name{font-weight:500;margin-bottom:2px}
-.mock-desc{color:var(--muted);font-size:11px;font-family:var(--font-mono)}
-.ic-pane{padding:14px;overflow-y:auto;flex:1}
+.mock-desc{color:var(--muted);font-size:11px;font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ic-pane{padding:14px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
 .ic-item{border:1px solid var(--border);border-radius:4px;padding:10px 12px;margin-bottom:8px;background:var(--surface)}
-.ic-bar{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-.ic-url{flex:1;font-family:var(--font-mono);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ic-bar{display:flex;align-items:center;gap:8px;margin-bottom:6px;min-width:0}
+.ic-url{flex:1;font-family:var(--font-mono);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .diff-pane{padding:14px;overflow-y:auto;flex:1}
 .diff-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .diff-col h4{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:8px}
 .diff-match{background:rgba(63,185,80,.06);border-left:2px solid var(--green)}
 .diff-miss{background:rgba(248,81,73,.06);border-left:2px solid var(--red)}
-.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center;padding:16px}
 .modal-bg.open{display:flex}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:18px;width:600px;max-width:95vw;max-height:85vh;overflow-y:auto}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:18px;width:600px;max-width:100%;max-height:90dvh;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .modal h3{font-size:14px;font-weight:600;margin-bottom:14px}
 .modal-row{margin-bottom:10px}
 .modal-row label{font-size:11px;color:var(--muted);display:block;margin-bottom:3px}
-.modal-row input,.modal-row textarea{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:4px;font-size:12px;font-family:inherit}
+.modal-row input,.modal-row textarea{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:7px 8px;border-radius:4px;font-size:13px;font-family:inherit}
 .modal-row textarea{font-family:var(--font-mono);resize:vertical}
-.modal-acts{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.modal-acts{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
 .drop-wrap{position:relative}
 .drop-menu{display:none;position:absolute;right:0;top:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;min-width:140px;z-index:50;margin-top:2px}
 .drop-menu.open{display:block}
-.drop-item{display:block;padding:7px 12px;color:var(--text);text-decoration:none;font-size:12px;cursor:pointer}
+.drop-item{display:block;padding:9px 12px;color:var(--text);text-decoration:none;font-size:12px;cursor:pointer}
 .drop-item:hover{background:var(--border)}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-.toast{position:fixed;bottom:20px;right:20px;padding:9px 16px;border-radius:5px;font-size:12px;font-weight:500;background:var(--surface);border:1px solid var(--border);color:var(--text);z-index:200;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast{position:fixed;bottom:20px;right:20px;left:20px;max-width:320px;margin:0 auto;padding:9px 16px;border-radius:5px;font-size:13px;font-weight:500;background:var(--surface);border:1px solid var(--border);color:var(--text);z-index:200;opacity:0;transition:opacity .2s;pointer-events:none;text-align:center}
 .toast.show{opacity:1}
 .toast.err{border-color:var(--red);color:var(--red)}
+
+/* Narrow desktop / large tablet */
+@media (max-width:1100px) {
+  .sidebar{width:300px;min-width:220px}
+}
+
+/* Mobile — fires at 900px to cover high-DPI phones reporting 750-900px CSS viewport */
+@media (max-width:900px) {
+  body{font-size:14px}
+  nav{padding:0 10px;gap:6px}
+  #live-lbl{display:none}
+  #nav-count{display:none}
+  .tab{padding:9px 10px;font-size:12px}
+  .layout{flex-direction:column}
+  .sidebar{width:100%;min-width:0;border-right:none;border-bottom:1px solid var(--border);flex:1}
+  .main{flex:1;display:none}
+  body.mobile-detail .sidebar{display:none}
+  body.mobile-detail .main{display:flex}
+  .back-btn{display:flex}
+  .fg4{grid-template-columns:1fr 1fr}
+  .diff-grid{grid-template-columns:1fr}
+  .dbar .btn{padding:6px 8px;font-size:11px}
+  .durl{font-size:11px}
+  .detail{padding:10px}
+  .code{max-height:180px;font-size:11px}
+  .kv td{font-size:11px}
+  .btn{padding:6px 10px;font-size:12px}
+  .filters input{font-size:13px;padding:6px 7px}
+  .cap-row{padding:10px 8px}
+  .toast{bottom:env(safe-area-inset-bottom, 16px);left:16px;right:16px}
+}
+
+@media (max-width:480px) {
+  .fg4{grid-template-columns:1fr}
+  .nav-right{gap:4px}
+  .btn{padding:5px 7px;font-size:11px}
+}
 </style>
 </head>
 <body>
@@ -136,10 +178,10 @@ nav{display:flex;align-items:center;gap:10px;padding:0 14px;height:44px;backgrou
 <div id="tab-captures" class="layout">
   <div class="sidebar">
     <div class="filters">
-      <input id="f-url" placeholder="URL" style="flex:1;min-width:80px" oninput="renderList()">
+      <input id="f-url" placeholder="URL" style="flex:1;min-width:60px" oninput="renderList()">
       <input id="f-method" placeholder="Method" style="width:65px" oninput="renderList()">
       <input id="f-status" placeholder="Status" style="width:56px" oninput="renderList()">
-      <input id="f-body" placeholder="Body" style="width:70px" oninput="renderList()">
+      <input id="f-body" placeholder="Body" style="width:60px" oninput="renderList()">
       <button class="btn" onclick="clearAll()">Clear</button>
     </div>
     <div class="cap-list" id="cap-list"></div>
@@ -161,7 +203,7 @@ nav{display:flex;align-items:center;gap:10px;padding:0 14px;height:44px;backgrou
         <div class="ff"><label>Content-Type</label><input id="m-ct" placeholder="application/json"></div>
       </div>
       <div class="fg1"><div class="ff"><label>Response body</label><textarea id="m-body" rows="3" placeholder='{"ok":true}'></textarea></div></div>
-      <div style="display:flex;gap:8px;margin-top:6px">
+      <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
         <button class="btn primary" onclick="addMock()">Add rule</button>
         <button class="btn danger" onclick="clearMocks()">Clear all</button>
       </div>
@@ -173,7 +215,7 @@ nav{display:flex;align-items:center;gap:10px;padding:0 14px;height:44px;backgrou
 <!-- Intercept tab -->
 <div id="tab-intercept" style="display:none;flex:1;overflow:hidden;flex-direction:column">
   <div class="ic-pane">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
       <span style="font-size:13px;font-weight:500">Paused requests</span>
       <button class="btn" onclick="loadIntercept()">Refresh</button>
     </div>
@@ -183,8 +225,8 @@ nav{display:flex;align-items:center;gap:10px;padding:0 14px;height:44px;backgrou
 
 <!-- Sessions tab -->
 <div id="tab-sessions" style="display:none;flex:1;overflow:hidden;flex-direction:column">
-  <div style="padding:14px;overflow-y:auto;flex:1">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+  <div style="padding:14px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
       <span style="font-size:13px;font-weight:500">Named sessions</span>
       <button class="btn primary" onclick="openSessModal()">Start session</button>
       <button class="btn" onclick="loadSessions()">Refresh</button>
@@ -193,8 +235,8 @@ nav{display:flex;align-items:center;gap:10px;padding:0 14px;height:44px;backgrou
     <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
       <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Compare sessions</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <select id="sess-a" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:4px;font-size:12px"><option value="">Session A</option></select>
-        <select id="sess-b" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:4px;font-size:12px"><option value="">Session B</option></select>
+        <select id="sess-a" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:4px;font-size:13px;flex:1;min-width:120px"><option value="">Session A</option></select>
+        <select id="sess-b" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:4px;font-size:13px;flex:1;min-width:120px"><option value="">Session B</option></select>
         <button class="btn primary" onclick="compareSessions()">Compare</button>
       </div>
       <div id="sess-diff" style="margin-top:14px"></div>
@@ -264,6 +306,7 @@ const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replac
 const scls = s => !s?'':s<300?'s2':s<400?'s3':s<500?'s4':'s5';
 const fmtDur = ns => !ns?'':ns/1e6<1000?(ns/1e6).toFixed(0)+'ms':(ns/1e6/1000).toFixed(2)+'s';
 const urlPath = r => { try{return new URL(r).pathname}catch{return r} };
+const isMobile = () => window.innerWidth <= 640;
 
 function renderList() {
   const fu = document.getElementById('f-url').value.toLowerCase();
@@ -286,8 +329,8 @@ function renderList() {
     const s = c.response?.status_code;
     const m = c.request.method;
     const cls = c.id===activeId?' active':c.id===pinnedId?' pinned':'';
-    const proto = c.protocol && c.protocol!=='h1' ? `<span style="font-size:10px;color:var(--muted);margin-right:3px">${esc(c.protocol)}</span>` : '';
-    const gqlBadge = c.graphql ? `<span style="font-size:10px;color:var(--purple);margin-right:3px">${esc(c.graphql.operation_name||'gql')}</span>` : '';
+    const proto = c.protocol && c.protocol!=='h1' ? `<span style="font-size:10px;color:var(--muted);flex-shrink:0">${esc(c.protocol)}</span>` : '';
+    const gqlBadge = c.graphql ? `<span style="font-size:10px;color:var(--purple);flex-shrink:0">${esc(c.graphql.operation_name||'gql')}</span>` : '';
     return `<div class="cap-row${cls}" onclick="select('${c.id}')">
       <span class="pill ${m}">${esc(m)}</span>
       <span class="st ${scls(s)}">${s||'—'}</span>
@@ -307,7 +350,16 @@ function select(id) {
   activeId = id;
   renderList();
   const c = captures.find(x=>x.id===id);
-  if (c) showDetail(c);
+  if (c) {
+    showDetail(c);
+    if (isMobile()) document.body.classList.add('mobile-detail');
+  }
+}
+
+function backToList() {
+  document.body.classList.remove('mobile-detail');
+  activeId = null;
+  renderList();
 }
 
 function hdrsHTML(h) {
@@ -320,23 +372,26 @@ function showDetail(c) {
   const m = c.request.method;
   const isPinned = c.id === pinnedId;
   let html = `<div class="detail">
+    <div class="back-btn">
+      <button class="btn" onclick="backToList()">← Back</button>
+    </div>
     <div class="dbar">
       <span class="pill ${m}" style="font-size:12px">${esc(m)}</span>
       <span class="st ${scls(s)}" style="font-size:13px">${s||''}</span>
       <span class="durl">${esc(c.request.url)}</span>
       <button class="btn primary" onclick="openReplayModal('${c.id}')">Replay</button>
-      <button class="btn" onclick="copyCurl('${c.id}')">Copy curl</button>
+      <button class="btn" onclick="copyCurl('${c.id}')">curl</button>
       <button class="btn" onclick="mockFromCapture('${c.id}')">Mock</button>
-      <button class="btn ${isPinned?'warn':''}" onclick="togglePin('${c.id}')">${isPinned?'Unpin':'Pin for diff'}</button>
-      ${pinnedId && pinnedId!==c.id?`<button class="btn" style="border-color:var(--purple);color:var(--purple)" onclick="showDiff('${pinnedId}','${c.id}')">Diff vs pinned</button>`:''}
+      <button class="btn ${isPinned?'warn':''}" onclick="togglePin('${c.id}')">${isPinned?'Unpin':'Pin'}</button>
+      ${pinnedId && pinnedId!==c.id?`<button class="btn" style="border-color:var(--purple);color:var(--purple)" onclick="showDiff('${pinnedId}','${c.id}')">Diff</button>`:''}
       <button class="btn danger" onclick="del('${c.id}')">Delete</button>
     </div>
-    <div class="sec"><div class="sec-t">Request headers</div><table class="kv"><tbody>${hdrsHTML(c.request.headers)}</tbody></table></div>`;
+    <div class="sec"><div class="sec-t">Request headers</div><div class="kv-wrap"><table class="kv"><tbody>${hdrsHTML(c.request.headers)}</tbody></table></div></div>`;
   if (c.request.body) {
     html+=`<div class="sec"><div class="sec-t">Request body</div><div class="code">${esc(c.request.body)}</div></div>`;
   }
   if (c.response) {
-    html+=`<div class="sec"><div class="sec-t">Response headers</div><table class="kv"><tbody>${hdrsHTML(c.response.headers)}</tbody></table></div>`;
+    html+=`<div class="sec"><div class="sec-t">Response headers</div><div class="kv-wrap"><table class="kv"><tbody>${hdrsHTML(c.response.headers)}</tbody></table></div></div>`;
     if (c.response.body) {
       let body=c.response.body;
       try{body=JSON.stringify(JSON.parse(body),null,2)}catch{}
@@ -349,26 +404,26 @@ function showDetail(c) {
     let rows = '';
     if (gql.operation_name) rows+=`<tr><td style="color:var(--dim)">Operation</td><td>${esc(gql.operation_name)}</td></tr>`;
     if (gql.variables && gql.variables!=='null') rows+=`<tr><td style="color:var(--dim);vertical-align:top">Variables</td><td><div class="code" style="max-height:120px">${esc(typeof gql.variables==='string'?gql.variables:JSON.stringify(gql.variables,null,2))}</div></td></tr>`;
-    html+=`<div class="sec"><div class="sec-t">${badge}GraphQL</div><table class="kv"><tbody>${rows}</tbody></table></div>`;
+    html+=`<div class="sec"><div class="sec-t">${badge}GraphQL</div><div class="kv-wrap"><table class="kv"><tbody>${rows}</tbody></table></div></div>`;
   }
   if (c.grpc) {
     const frames = (c.grpc.frames||[]).map(f=>{
       const dir = f.direction==='request'?'→':'←';
       const decoded = f.direction==='request' ? c.grpc.decoded_request : c.grpc.decoded_response;
       const body = decoded ? (typeof decoded==='string'?decoded:JSON.stringify(decoded,null,2)) : (f.data||'');
-      return `<div class="frame-row"><span class="frame-dir">${dir}</span><div style="flex:1"><div class="code" style="max-height:80px">${esc(body)}</div></div></div>`;
+      return `<div class="frame-row"><span class="frame-dir">${dir}</span><div style="flex:1;min-width:0"><div class="code" style="max-height:80px">${esc(body)}</div></div></div>`;
     }).join('');
     html+=`<div class="sec"><div class="sec-t">gRPC — ${esc(c.grpc.method||'')}</div>${frames}</div>`;
   }
   if (c.sse?.frames?.length) {
     const rows = c.sse.frames.slice(0,50).map(f=>{
       const name = f.event||'message';
-      return `<div class="frame-row"><span class="frame-dir" style="min-width:80px;color:var(--cyan)">${esc(name)}</span><div style="flex:1"><div class="code" style="max-height:60px">${esc(f.data||'')}</div></div></div>`;
+      return `<div class="frame-row"><span class="frame-dir" style="min-width:70px;color:var(--cyan)">${esc(name)}</span><div style="flex:1;min-width:0"><div class="code" style="max-height:60px">${esc(f.data||'')}</div></div></div>`;
     }).join('');
     html+=`<div class="sec"><div class="sec-t">SSE frames (${c.sse.frames.length})</div>${rows}</div>`;
   }
   if (c.websocket?.frames?.length) {
-    html+=`<div class="sec"><div class="sec-t">WebSocket frames (${c.websocket.frames.length})</div>${c.websocket.frames.slice(0,30).map(f=>`<div class="frame-row"><span class="frame-dir">${f.direction==='s2c'?'←':'→'}</span><div style="flex:1"><div class="code" style="max-height:60px">${esc(f.payload||'')}</div></div></div>`).join('')}</div>`;
+    html+=`<div class="sec"><div class="sec-t">WebSocket frames (${c.websocket.frames.length})</div>${c.websocket.frames.slice(0,30).map(f=>`<div class="frame-row"><span class="frame-dir">${f.direction==='s2c'?'←':'→'}</span><div style="flex:1;min-width:0"><div class="code" style="max-height:60px">${esc(f.payload||'')}</div></div></div>`).join('')}</div>`;
   }
   html+='</div>';
   document.getElementById('main-panel').innerHTML=html;
@@ -403,6 +458,9 @@ function showDiff(idA, idB) {
     </tr>`;
   }
   document.getElementById('main-panel').innerHTML=`<div class="detail">
+    <div class="back-btn">
+      <button class="btn" onclick="backToList()">← Back</button>
+    </div>
     <div class="dbar">
       <span style="font-weight:600">Diff</span>
       <span style="color:var(--muted);font-size:12px">${esc(urlPath(a.request.url))}</span>
@@ -410,15 +468,16 @@ function showDiff(idA, idB) {
       <span style="color:var(--muted);font-size:12px">${esc(urlPath(b.request.url))}</span>
       <button class="btn" onclick="showDetail(captures.find(x=>x.id==='${idB}'))">Back</button>
     </div>
-    <table style="width:100%;border-collapse:collapse">
+    <div class="kv-wrap"><table style="width:100%;border-collapse:collapse">
       <thead><tr>
         <th style="padding:5px 8px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border)">Field</th>
         <th style="padding:5px 8px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border)">Pinned</th>
         <th style="padding:5px 8px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border)">Current</th>
       </tr></thead>
       <tbody>${rows}</tbody>
-    </table>
+    </table></div>
   </div>`;
+  if (isMobile()) document.body.classList.add('mobile-detail');
 }
 
 let replayCapId = null;
@@ -460,10 +519,10 @@ function copyCurl(id) {
   let cmd = `curl -X ${c.request.method} '${c.request.url.replace(/'/g,"'\\''")}'`;
   for (const [k,vs] of Object.entries(c.request.headers||{})) {
     if (skip.has(k.toLowerCase())) continue;
-    for (const v of vs) cmd += `\n  -H '${k}: ${v.replace(/'/g,"'\\''")}' `;
+    for (const v of vs) cmd += `\n  -H '${k}: ${v.replace(/'/g,"'\\''")}'`;
   }
   if (c.request.body) cmd+=`\n  --data '${String(c.request.body).replace(/'/g,"'\\''")}'`;
-  navigator.clipboard.writeText(cmd).then(()=>alert('curl command copied to clipboard'));
+  navigator.clipboard.writeText(cmd).then(()=>showToast('curl copied'));
 }
 
 function mockFromCapture(id) {
@@ -475,12 +534,17 @@ function mockFromCapture(id) {
   document.getElementById('m-ct').value = c.response?.headers?.['Content-Type']?.[0]||'application/json';
   document.getElementById('m-body').value = c.response?.body||'';
   switchTabByName('mocks');
+  if (isMobile()) document.body.classList.remove('mobile-detail');
 }
 
 async function del(id) {
   await fetch(`/api/captures/${id}`, {method:'DELETE'});
   captures = captures.filter(c=>c.id!==id);
-  if (activeId===id) { activeId=null; document.getElementById('main-panel').innerHTML='<div class="empty">Select a capture to inspect</div>'; }
+  if (activeId===id) {
+    activeId=null;
+    document.getElementById('main-panel').innerHTML='<div class="empty">Select a capture to inspect</div>';
+    if (isMobile()) document.body.classList.remove('mobile-detail');
+  }
   if (pinnedId===id) pinnedId=null;
   renderList();
 }
@@ -490,6 +554,7 @@ async function clearAll() {
   await fetch('/api/captures', {method:'DELETE'});
   captures=[]; activeId=null; pinnedId=null;
   document.getElementById('main-panel').innerHTML='<div class="empty">Select a capture to inspect</div>';
+  if (isMobile()) document.body.classList.remove('mobile-detail');
   renderList();
 }
 
@@ -536,7 +601,7 @@ async function loadIntercept() {
           <span class="pill ${p.method}">${esc(p.method)}</span>
           <span class="ic-url" title="${esc(p.url)}">${esc(p.url)}</span>
         </div>
-        <div style="display:flex;gap:6px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn primary" onclick="icForward('${p.id}')">Forward</button>
           <button class="btn" onclick="openIcEdit('${p.id}')">Edit</button>
           <button class="btn danger" onclick="icDrop('${p.id}')">Drop</button>
@@ -590,7 +655,6 @@ async function openCAModal() {
   }
   const port = info.web_port || '8080';
   const lanURLs = (info.lan_ips||[]).map(ip => `http://${ip}:${port}/ca.pem`);
-  const localURL = `http://localhost:${port}/ca.pem`;
   let html = `
     <div class="sec">
       <div class="sec-t">Desktop</div>
@@ -604,11 +668,11 @@ async function openCAModal() {
     html += `</div>
     <div class="sec">
       <div class="sec-t">iOS</div>
-      <div style="font-size:12px;color:var(--muted);line-height:1.7">1. Open the URL above in <b>Safari</b> → tap Allow<br>2. Go to <b>Settings → General → VPN &amp; Device Management</b><br>3. Tap the Snare profile → Install<br>4. Go to <b>Settings → General → About → Certificate Trust Settings</b><br>5. Enable full trust for Snare CA</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8">1. Open the URL above in <b>Safari</b> → tap Allow<br>2. Go to <b>Settings → General → VPN &amp; Device Management</b><br>3. Tap the Snare profile → Install<br>4. Go to <b>Settings → General → About → Certificate Trust Settings</b><br>5. Enable full trust for Snare CA</div>
     </div>
     <div class="sec">
       <div class="sec-t">Android</div>
-      <div style="font-size:12px;color:var(--muted);line-height:1.7">1. Open the URL above in Chrome → download the file<br>2. Go to <b>Settings → Security → Install from storage</b><br>3. Select <b>snare-ca.pem</b> and install as a CA certificate<br><span style="color:var(--yellow)">Android 11+: Settings → Security → Advanced → Encryption &amp; credentials → Install a certificate → CA certificate</span></div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8">1. Open the URL above in Chrome → download the file<br>2. Go to <b>Settings → Security → Install from storage</b><br>3. Select <b>snare-ca.pem</b> and install as a CA certificate<br><span style="color:var(--yellow)">Android 11+: Settings → Security → Advanced → Encryption &amp; credentials → Install a certificate → CA certificate</span></div>
     </div>`;
   } else {
     html += `<div style="color:var(--yellow);font-size:12px">No LAN IP detected. Start snare with <code style="font-family:var(--font-mono)">--bind 0.0.0.0</code> to allow mobile devices to connect.</div>`;
@@ -676,7 +740,7 @@ async function loadSessions() {
           <span style="margin-left:auto;font-size:11px;color:var(--muted)">${esc(s.start_formatted)}${s.end_formatted?' → '+esc(s.end_formatted):''}</span>
           <span style="font-size:11px;color:var(--muted)">${s.count} req</span>
         </div>
-        <div style="display:flex;gap:6px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
           ${s.active ? `<button class="btn" onclick="endSession('${esc(s.name)}')">End</button>` : ''}
           <button class="btn danger" onclick="deleteSession('${esc(s.name)}')">Delete</button>
         </div>
@@ -717,7 +781,7 @@ async function compareSessions() {
   if (!diff.rows || diff.rows.length===0) {
     html += '<div style="color:var(--green)">Sessions match.</div>';
   } else {
-    html += `<table style="width:100%;border-collapse:collapse;font-size:12px">
+    html += `<div class="kv-wrap"><table style="width:100%;border-collapse:collapse;font-size:12px">
       <thead><tr>
         <th style="padding:4px 8px;text-align:left;color:var(--muted);border-bottom:1px solid var(--border)">#</th>
         <th style="padding:4px 8px;text-align:left;color:var(--muted);border-bottom:1px solid var(--border)">${esc(a)}</th>
@@ -729,7 +793,7 @@ async function compareSessions() {
         <td style="padding:4px 8px;font-family:var(--font-mono)">${esc(row.line_a||'—')}</td>
         <td style="padding:4px 8px;font-family:var(--font-mono)">${esc(row.line_b||'—')}</td></tr>`;
     });
-    html += `</tbody></table>`;
+    html += `</tbody></table></div>`;
     html += `<div style="margin-top:10px;font-size:12px;color:var(--red)">${diff.diffs} difference(s) found.</div>`;
   }
   document.getElementById('sess-diff').innerHTML = html;
@@ -749,11 +813,16 @@ function connectSSE() {
     captures = []; activeId = null; pinnedId = null;
     renderList();
     document.getElementById('main-panel').innerHTML = '<div class="empty">Select a capture to inspect</div>';
+    document.body.classList.remove('mobile-detail');
   });
   es.addEventListener('deleted', e => {
     const id = JSON.parse(e.data);
     captures = captures.filter(c => c.id !== id);
-    if (activeId === id) { activeId = null; document.getElementById('main-panel').innerHTML = '<div class="empty">Select a capture to inspect</div>'; }
+    if (activeId === id) {
+      activeId = null;
+      document.getElementById('main-panel').innerHTML = '<div class="empty">Select a capture to inspect</div>';
+      if (isMobile()) document.body.classList.remove('mobile-detail');
+    }
     if (pinnedId === id) pinnedId = null;
     renderList();
   });

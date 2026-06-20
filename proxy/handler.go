@@ -309,7 +309,7 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 	resp.Header.Del("Alt-Svc")
 
 	reqCaptureBody := decompressBody(bodyBuf, req.Header.Get("Content-Encoding"))
-	reqHeaders := req.Header.Clone()
+	reqHeaders := outReq.Header.Clone()
 	if len(reqCaptureBody) != len(bodyBuf) {
 		reqHeaders.Del("Content-Encoding")
 		reqHeaders.Set("Content-Length", strconv.Itoa(len(reqCaptureBody)))
@@ -328,7 +328,7 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 			},
 			Duration: duration,
 		}
-		c.GraphQL = detectGraphQL(req.Header.Get("Content-Type"), reqCaptureBody)
+		c.GraphQL = detectGraphQL(outReq.Header.Get("Content-Type"), reqCaptureBody)
 		if len(h.Shadows) > 0 {
 			go h.fireShadows(req.Method, outReq.URL.String(), req.Header, bodyBuf)
 		}
@@ -437,7 +437,7 @@ func (h *Handler) serveReverse(rw http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		if !ignored {
 			h.addCapture(&capture.Capture{ID: capID, Timestamp: start, Protocol: reqProto(req),
-				Request:  capture.RequestSnapshot{Method: req.Method, URL: outURL.String(), Headers: req.Header.Clone()},
+				Request:  capture.RequestSnapshot{Method: req.Method, URL: outURL.String(), Headers: outReq.Header.Clone()},
 				Duration: duration, Error: err.Error(),
 			})
 		}
@@ -449,7 +449,7 @@ func (h *Handler) serveReverse(rw http.ResponseWriter, req *http.Request) {
 	resp.Header.Del("Alt-Svc")
 
 	reqCaptureBody := decompressBody(bodyBuf, req.Header.Get("Content-Encoding"))
-	reqHeaders := req.Header.Clone()
+	reqHeaders := outReq.Header.Clone()
 	if len(reqCaptureBody) != len(bodyBuf) {
 		reqHeaders.Del("Content-Encoding")
 		reqHeaders.Set("Content-Length", strconv.Itoa(len(reqCaptureBody)))
@@ -468,7 +468,7 @@ func (h *Handler) serveReverse(rw http.ResponseWriter, req *http.Request) {
 			},
 			Duration: duration,
 		}
-		c.GraphQL = detectGraphQL(req.Header.Get("Content-Type"), reqCaptureBody)
+		c.GraphQL = detectGraphQL(outReq.Header.Get("Content-Type"), reqCaptureBody)
 		if len(h.Shadows) > 0 {
 			go h.fireShadows(req.Method, outURL.String(), req.Header, bodyBuf)
 		}

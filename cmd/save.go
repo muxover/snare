@@ -44,7 +44,11 @@ func runSave(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(out, data, 0644)
+		if err := os.WriteFile(out, data, 0644); err != nil {
+			return err
+		}
+		fmt.Printf("Saved %d capture(s) to %s\n", len(captures), out)
+		return nil
 	}
 	if len(args) == 0 {
 		return fmt.Errorf("specify capture id or use --all")
@@ -62,5 +66,9 @@ func runSave(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(out, data, 0644)
+	if err := os.WriteFile(out, data, 0644); err != nil {
+		return err
+	}
+	fmt.Printf("Saved %s to %s\n", c.ID[:8], out)
+	return nil
 }

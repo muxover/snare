@@ -233,7 +233,7 @@ plugins:
 --operation   GraphQL operation name
 --since       Start timestamp (RFC3339)
 --until       End timestamp (RFC3339)
---limit       Max results (list only)
+-n, --last    Max results (list only)
 --interval    Poll interval (watch only, default: 500ms)
 ```
 
