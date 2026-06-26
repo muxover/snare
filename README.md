@@ -197,8 +197,48 @@ No proxy env vars needed. All traffic to `127.0.0.1:8888` is forwarded to the ta
     --no-config         Ignore ~/.snare/config.yaml
     --proto             Protobuf definition file for gRPC decoding (repeatable)
     --no-h3             Disable HTTP/3 QUIC server in reverse proxy mode
+    --hook              JS hook file; onRequest/onResponse/onCapture called per request; reloaded from disk on every request (repeatable)
 -v, --verbose           Debug logging
 ```
+
+---
+
+## JS Hooks
+
+`snare serve --hook hook.js` loads a JavaScript file and calls its exported functions for every request that passes through the proxy. The file is reloaded from disk on every request — edit it and the next request picks up your changes without restarting.
+
+**Available functions:**
+
+```js
+// Called before the request is forwarded. Mutate r to change what goes out.
+// Return an object to short-circuit — the origin is never contacted.
+function onRequest(r) {
+  r.method            // string — change the HTTP method
+  r.url               // string — change the target URL
+  r.headers["X-Foo"] = "bar"   // add/override a header
+  delete r.headers["X-Remove"] // remove a header
+  r.body              // string — change the request body
+
+  // Short-circuit: answer without hitting the origin
+  return { status: 200, headers: { "Content-Type": "application/json" }, body: '{"mocked":true}' }
+}
+
+// Called after the response is received. Mutate res to change what the client sees.
+function onResponse(r, res) {
+  res.status           // number — change the status code
+  res.headers["X-Injected"] = "yes"
+  res.body = res.body.replace("staging", "production")
+}
+
+// Called after the capture is saved. Read-only view of the full capture JSON.
+function onCapture(c) {
+  if (c.response && c.response.status_code >= 500) {
+    console.log("5xx:", c.request.method, c.request.url)
+  }
+}
+```
+
+`console.log()` writes to snare's verbose log (`-v`). Hook errors are logged and skipped — a broken hook never crashes the proxy. Pass `--hook` multiple times to load multiple files; all run in order.
 
 ---
 
@@ -277,7 +317,7 @@ plugins:
 ## export Flags
 
 ```
--f, --format  Output format: json (default), har, postman, openapi
+-f, --format  Output format: json (default), har, postman
 -n, --last    Number of captures to export (default: 50)
 ```
 
@@ -406,6 +446,9 @@ snare watch --operation CreateOrder
 
 # Reverse proxy with HTTP/3 disabled
 snare serve --mode reverse --target http://localhost:3000 --no-h3
+
+# JS hook: inject a header and log all 5xx
+snare serve --hook hook.js
 
 # Diff two test runs
 snare session start baseline

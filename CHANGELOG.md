@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-06-26
+
+### Added
+
+- `snare serve --hook <file.js>` — load a JavaScript hook file executed for every request. Three optional functions can be defined: `onRequest(r)` (called before forwarding; mutate `r.method`, `r.url`, `r.headers`, `r.body`; return `{status, headers, body}` to short-circuit without hitting the origin), `onResponse(r, res)` (called after the response is received; mutate `res.status`, `res.headers`, `res.body`; changes are forwarded to the client and stored in the capture), `onCapture(c)` (called after the capture is saved; read-only view of the full capture JSON, useful for custom logging). The hook file is reloaded from disk on every request — edit it without restarting the proxy. `console.log()` writes to snare's verbose log (`-v`). Hook errors are logged and skipped; a broken hook never crashes the proxy. `--hook` is repeatable; multiple files run in order.
+- JS engine: [Goja](https://github.com/dop251/goja) — pure Go ES2015+ runtime, no CGO, fast startup.
+
 ## [2.1.0] - 2026-06-20
 
 ### Added
@@ -180,7 +187,8 @@ First release.
 - Body decompression (gzip, deflate, brotli) for readable captures.
 - Config via `SNARE_STORE`, `SNARE_CA` and serve flags (port, bind, max-captures).
 
-[Unreleased]: https://github.com/muxover/snare/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/muxover/snare/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/muxover/snare/releases/tag/v2.2.0
 [2.1.0]: https://github.com/muxover/snare/releases/tag/v2.1.0
 [2.0.0]: https://github.com/muxover/snare/releases/tag/v2.0.0
 [1.9.0]: https://github.com/muxover/snare/releases/tag/v1.9.0

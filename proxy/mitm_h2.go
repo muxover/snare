@@ -61,6 +61,33 @@ func (m *mitmH2Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	outReq.Host = m.hostname
 	m.parent.applyOutboundMods(outReq)
 
+	if m.parent.Hooks != nil {
+		sc, newBody := m.parent.Hooks.RunOnRequest(outReq, bodyBuf)
+		bodyBuf = newBody
+		outReq.Body = io.NopCloser(bytes.NewReader(bodyBuf))
+		if sc != nil {
+			for k, v := range sc.Headers {
+				rw.Header().Set(k, v)
+			}
+			rw.WriteHeader(sc.Status)
+			_, _ = io.WriteString(rw, sc.Body)
+			reqCaptureBody := decompressBody(bodyBuf, outReq.Header.Get("Content-Encoding"))
+			m.parent.addCapture(&capture.Capture{
+				ID: capID, Timestamp: start, Protocol: "h2",
+				Request: capture.RequestSnapshot{
+					Method: outReq.Method, URL: outReq.URL.String(),
+					Headers: outReq.Header.Clone(), Body: capture.BodyBytes(reqCaptureBody),
+				},
+				Response: &capture.ResponseSnapshot{
+					StatusCode: sc.Status, Headers: httpMapToHeader(sc.Headers),
+					Body: capture.BodyBytes([]byte(sc.Body)),
+				},
+				Duration: time.Since(start),
+			})
+			return
+		}
+	}
+
 	resp, err := m.transport.RoundTrip(outReq)
 	if err != nil {
 		m.parent.addCapture(&capture.Capture{ID: capID, Timestamp: start, Protocol: "h2", Error: err.Error()})
@@ -98,6 +125,13 @@ func (m *mitmH2Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	respBody, _ := io.ReadAll(resp.Body)
+
+	if m.parent.Hooks != nil {
+		status := resp.StatusCode
+		respBody = m.parent.Hooks.RunOnResponse(outReq.Method, outReq.URL.String(), &status, resp.Header, respBody)
+		resp.StatusCode = status
+	}
+
 	captureBody := decompressBody(respBody, resp.Header.Get("Content-Encoding"))
 	respHeaders := resp.Header.Clone()
 	if len(captureBody) != len(respBody) {

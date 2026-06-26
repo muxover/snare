@@ -54,6 +54,7 @@ type Handler struct {
 	Shadows          []*url.URL
 	Plugins          []string
 	ProtoDecoder     *ProtoDecoder
+	Hooks            *HookEngine
 }
 
 type HostRewrite struct {
@@ -85,6 +86,9 @@ func (h *Handler) addCapture(c *capture.Capture) {
 	}
 	if len(h.Plugins) > 0 {
 		go h.runPlugins(c)
+	}
+	if h.Hooks != nil {
+		go h.Hooks.RunOnCapture(c)
 	}
 }
 
@@ -270,6 +274,33 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 	outReq.Host = req.Host
 	h.applyOutboundMods(outReq)
 
+	if !ignored && h.Hooks != nil {
+		sc, newBody := h.Hooks.RunOnRequest(outReq, bodyBuf)
+		bodyBuf = newBody
+		outReq.Body = io.NopCloser(bytes.NewReader(bodyBuf))
+		if sc != nil {
+			for k, v := range sc.Headers {
+				rw.Header().Set(k, v)
+			}
+			rw.WriteHeader(sc.Status)
+			_, _ = io.WriteString(rw, sc.Body)
+			reqCaptureBody := decompressBody(bodyBuf, outReq.Header.Get("Content-Encoding"))
+			h.addCapture(&capture.Capture{
+				ID: capID, Timestamp: start, Protocol: reqProto(req),
+				Request: capture.RequestSnapshot{
+					Method: outReq.Method, URL: outReq.URL.String(),
+					Headers: outReq.Header.Clone(), Body: capture.BodyBytes(reqCaptureBody),
+				},
+				Response: &capture.ResponseSnapshot{
+					StatusCode: sc.Status, Headers: httpMapToHeader(sc.Headers),
+					Body: capture.BodyBytes([]byte(sc.Body)),
+				},
+				Duration: time.Since(start),
+			})
+			return
+		}
+	}
+
 	if !ignored && isWebSocketUpgrade(outReq) && h.tryServeHTTPWebSocket(rw, outReq, capID, start, bodyBuf) {
 		return
 	}
@@ -343,6 +374,13 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) {
 	if len(h.BodyRewrites) > 0 {
 		respBody = h.applyBodyRewrites(respBody)
 	}
+
+	if !ignored && h.Hooks != nil {
+		status := resp.StatusCode
+		respBody = h.Hooks.RunOnResponse(outReq.Method, outReq.URL.String(), &status, resp.Header, respBody)
+		resp.StatusCode = status
+	}
+
 	captureBody := decompressBody(respBody, resp.Header.Get("Content-Encoding"))
 	respHeaders := resp.Header.Clone()
 	if len(captureBody) != len(respBody) {
@@ -432,6 +470,33 @@ func (h *Handler) serveReverse(rw http.ResponseWriter, req *http.Request) {
 	outReq.Host = h.ReverseTarget.Host
 	h.applyOutboundMods(outReq)
 
+	if !ignored && h.Hooks != nil {
+		sc, newBody := h.Hooks.RunOnRequest(outReq, bodyBuf)
+		bodyBuf = newBody
+		outReq.Body = io.NopCloser(bytes.NewReader(bodyBuf))
+		if sc != nil {
+			for k, v := range sc.Headers {
+				rw.Header().Set(k, v)
+			}
+			rw.WriteHeader(sc.Status)
+			_, _ = io.WriteString(rw, sc.Body)
+			reqCaptureBody := decompressBody(bodyBuf, outReq.Header.Get("Content-Encoding"))
+			h.addCapture(&capture.Capture{
+				ID: capID, Timestamp: start, Protocol: reqProto(req),
+				Request: capture.RequestSnapshot{
+					Method: outReq.Method, URL: outURL.String(),
+					Headers: outReq.Header.Clone(), Body: capture.BodyBytes(reqCaptureBody),
+				},
+				Response: &capture.ResponseSnapshot{
+					StatusCode: sc.Status, Headers: httpMapToHeader(sc.Headers),
+					Body: capture.BodyBytes([]byte(sc.Body)),
+				},
+				Duration: time.Since(start),
+			})
+			return
+		}
+	}
+
 	resp, err := h.Transport.RoundTrip(outReq)
 	duration := time.Since(start)
 	if err != nil {
@@ -483,6 +548,13 @@ func (h *Handler) serveReverse(rw http.ResponseWriter, req *http.Request) {
 	if len(h.BodyRewrites) > 0 {
 		respBody = h.applyBodyRewrites(respBody)
 	}
+
+	if !ignored && h.Hooks != nil {
+		status := resp.StatusCode
+		respBody = h.Hooks.RunOnResponse(outReq.Method, outURL.String(), &status, resp.Header, respBody)
+		resp.StatusCode = status
+	}
+
 	captureBody := decompressBody(respBody, resp.Header.Get("Content-Encoding"))
 	respHeaders := resp.Header.Clone()
 	if len(captureBody) != len(respBody) {
@@ -779,6 +851,37 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 			req.Body = io.NopCloser(bytes.NewReader(bodyBuf))
 		}
 
+		if !ignored && h.Hooks != nil {
+			sc, newBody := h.Hooks.RunOnRequest(req, bodyBuf)
+			bodyBuf = newBody
+			req.Body = io.NopCloser(bytes.NewReader(bodyBuf))
+			if sc != nil {
+				scResp := &http.Response{
+					StatusCode: sc.Status, Proto: "HTTP/1.1",
+					ProtoMajor: 1, ProtoMinor: 1,
+					Header:        httpMapToHeader(sc.Headers),
+					Body:          io.NopCloser(strings.NewReader(sc.Body)),
+					ContentLength: int64(len(sc.Body)),
+					Request:       req,
+				}
+				_ = scResp.Write(clientConn)
+				reqCaptureBody := decompressBody(bodyBuf, req.Header.Get("Content-Encoding"))
+				h.addCapture(&capture.Capture{
+					ID: capID, Timestamp: start, Protocol: "h1",
+					Request: capture.RequestSnapshot{
+						Method: req.Method, URL: req.URL.String(),
+						Headers: req.Header.Clone(), Body: capture.BodyBytes(reqCaptureBody),
+					},
+					Response: &capture.ResponseSnapshot{
+						StatusCode: sc.Status, Headers: httpMapToHeader(sc.Headers),
+						Body: capture.BodyBytes([]byte(sc.Body)),
+					},
+					Duration: time.Since(start),
+				})
+				continue
+			}
+		}
+
 		reqBytes, _ := httputil.DumpRequest(req, false)
 		if _, err := originConn.Write(reqBytes); err != nil {
 			if !ignored {
@@ -847,6 +950,12 @@ func (h *Handler) mitmHTTP1(clientConn net.Conn, originConn *tls.Conn, hostname 
 
 		if len(h.BodyRewrites) > 0 {
 			respBody = h.applyBodyRewrites(respBody)
+		}
+
+		if !ignored && h.Hooks != nil {
+			status := resp.StatusCode
+			respBody = h.Hooks.RunOnResponse(req.Method, req.URL.String(), &status, resp.Header, respBody)
+			resp.StatusCode = status
 		}
 
 		if !ignored {
@@ -1046,6 +1155,14 @@ func (h *Handler) decodeGRPC(g *capture.GRPCCapture, method string, reqBody, res
 	if decoded, err := h.ProtoDecoder.DecodeResponse(method, respBody); err == nil {
 		g.DecodedResponse = decoded
 	}
+}
+
+func httpMapToHeader(m map[string]string) http.Header {
+	h := make(http.Header, len(m))
+	for k, v := range m {
+		h.Set(k, v)
+	}
+	return h
 }
 
 func (h *Handler) applyMapRemote(req *http.Request) {

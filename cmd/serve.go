@@ -62,6 +62,7 @@ var (
 	serveNoConfig         bool
 	serveProtoFiles       []string
 	serveNoH3             bool
+	serveHooks            []string
 )
 
 var serveCmd = &cobra.Command{
@@ -103,6 +104,7 @@ func init() {
 	serveCmd.Flags().BoolVar(&serveNoConfig, "no-config", false, "Ignore ~/.snare/config.yaml")
 	serveCmd.Flags().StringArrayVar(&serveProtoFiles, "proto", nil, "Protobuf definition file for gRPC decoding; decoded fields shown instead of raw bytes (repeatable)")
 	serveCmd.Flags().BoolVar(&serveNoH3, "no-h3", false, "Disable HTTP/3 (QUIC) server in reverse proxy mode")
+	serveCmd.Flags().StringArrayVar(&serveHooks, "hook", nil, "JS hook file executed per request/response/capture; reloaded from disk on every request (repeatable)")
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
@@ -235,6 +237,11 @@ func runServe(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	hooks := proxy.NewHookEngine(serveHooks, log)
+	if hooks != nil {
+		log.Info("JS hooks loaded", "files", serveHooks)
+	}
+
 	handler := &proxy.Handler{
 		Transport:        transport,
 		Store:            store,
@@ -260,6 +267,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		Shadows:          shadows,
 		Plugins:          servePlugins,
 		ProtoDecoder:     protoDecoder,
+		Hooks:            hooks,
 	}
 
 	addr := serveBind + ":" + servePort
