@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-07-01
+
+### Added
+
+- `snare bundle pack` — pack captures, all mock rules, and all sessions into a gzip-compressed NDJSON bundle (`.snare` file). `--session <name>` limits captures to a named session. `--ids <id,...>` packs specific captures by ID prefix. `--out <file>` sets the output path (default: `bundle.snare`).
+- `snare bundle unpack <file.snare>` — import captures, mocks, and sessions from a bundle. Captures are skipped on ID collision; mocks and sessions are skipped if the ID/name already exists. Prints a summary of imported vs skipped counts.
+- `snare export --format bundle` — shortcut to pack all recent captures into `export.snare`.
+- `snare diff` now emits a semantic JSON diff for request/response bodies that are valid JSON objects: added keys are shown in green, removed keys in red, changed values in yellow with `old → new`. Non-JSON bodies fall back to the previous side-by-side display.
+- `--slow <ms>` filter added to `snare list`, `snare watch`, and `snare assert`. Shows only captures whose round-trip duration exceeded the given threshold in milliseconds.
+
 ## [2.3.0] - 2026-07-01
 
 ### Added
@@ -197,7 +207,8 @@ First release.
 - Body decompression (gzip, deflate, brotli) for readable captures.
 - Config via `SNARE_STORE`, `SNARE_CA` and serve flags (port, bind, max-captures).
 
-[Unreleased]: https://github.com/muxover/snare/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/muxover/snare/compare/v2.4.0...HEAD
+[2.4.0]: https://github.com/muxover/snare/releases/tag/v2.4.0
 [2.3.0]: https://github.com/muxover/snare/releases/tag/v2.3.0
 [2.2.0]: https://github.com/muxover/snare/releases/tag/v2.2.0
 [2.1.0]: https://github.com/muxover/snare/releases/tag/v2.1.0

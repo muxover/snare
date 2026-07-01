@@ -153,6 +153,13 @@ No proxy env vars needed. All traffic to `127.0.0.1:8888` is forwarded to the ta
 | `snare assert` | Assert conditions on captures; exits 1 on failure |
 | `snare fuzz <id>` | Send mutated variants of a captured request |
 
+**Bundles**
+
+| Command | Description |
+|---------|-------------|
+| `snare bundle pack` | Pack captures, mocks, and sessions into a `.snare` bundle |
+| `snare bundle unpack <file.snare>` | Import captures, mocks, and sessions from a bundle |
+
 **Automation**
 
 | Command | Description |
@@ -280,6 +287,7 @@ plugins:
 --operation   GraphQL operation name
 --since       Start timestamp (RFC3339)
 --until       End timestamp (RFC3339)
+--slow        Show only captures slower than N milliseconds
 -n, --last    Max results (list only)
 --interval    Poll interval (watch only, default: 500ms)
 ```
@@ -351,9 +359,21 @@ plugins:
     --status  Filter by response status code
     --url     Filter by URL substring
     --body    Filter by substring in request or response body
+    --slow    Filter to captures slower than N milliseconds
     --min     Minimum matching captures (default: 1)
     --max     Maximum matching captures (-1 = no limit)
     --format  Output format: text (default) or junit
+```
+
+---
+
+## bundle Flags
+
+```
+pack:
+  -o, --out string       Output file (default "bundle.snare")
+      --session string   Pack only captures from this named session
+      --ids string       Comma-separated capture IDs (or prefixes) to pack
 ```
 
 ---
@@ -524,6 +544,18 @@ snare diff --check baseline --strict --ignore-fields timestamp,request_id
 # Fuzz a captured request
 snare fuzz <id>
 snare fuzz <id> --proxy http://127.0.0.1:8888 --count 50
+
+# Find slow requests
+snare list --slow 500
+snare watch --slow 1000
+snare assert --slow 200 --max 0   # fail CI if any request exceeded 200ms
+
+# Share a debugging context with a teammate
+snare bundle pack --session my-session --out debug.snare
+snare bundle unpack debug.snare
+
+# Export as bundle
+snare export --format bundle
 
 # Diff two test runs
 snare session start baseline

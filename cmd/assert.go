@@ -19,6 +19,7 @@ var (
 	assertMin    int
 	assertMax    int
 	assertFormat string
+	assertSlow   int
 )
 
 var assertCmd = &cobra.Command{
@@ -36,12 +37,13 @@ func init() {
 	assertCmd.Flags().IntVar(&assertMin, "min", 1, "Minimum number of matching captures (inclusive)")
 	assertCmd.Flags().IntVar(&assertMax, "max", -1, "Maximum number of matching captures (-1 = no limit)")
 	assertCmd.Flags().StringVar(&assertFormat, "format", "text", "Output format: text or junit")
+	assertCmd.Flags().IntVar(&assertSlow, "slow", 0, "Filter to captures slower than N milliseconds")
 }
 
 func runAssert(cmd *cobra.Command, args []string) error {
 	store := capture.NewStore(0, config.StoreDir())
 	captures := store.AllFromDisk()
-	matched := filterCaptures(captures, assertMethod, assertStatus, assertURL, "", assertBody, "", time.Time{}, time.Time{})
+	matched := filterCaptures(captures, assertMethod, assertStatus, assertURL, "", assertBody, "", time.Time{}, time.Time{}, assertSlow)
 	n := len(matched)
 
 	label := buildAssertLabel()
@@ -83,6 +85,9 @@ func buildAssertLabel() string {
 	}
 	if assertBody != "" {
 		parts = append(parts, "body="+assertBody)
+	}
+	if assertSlow > 0 {
+		parts = append(parts, fmt.Sprintf("slow>%dms", assertSlow))
 	}
 	if len(parts) == 0 {
 		return "*"

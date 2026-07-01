@@ -354,9 +354,59 @@ func diffBodies(title string, ba, bb capture.BodyBytes, la, lb string) {
 		return
 	}
 	fmt.Println(title + " (differ)")
+	if printJSONDiff(ba, bb) {
+		fmt.Println()
+		return
+	}
 	printBodySide(la, ba)
 	printBodySide(lb, bb)
 	fmt.Println()
+}
+
+func printJSONDiff(a, b []byte) bool {
+	var ma, mb map[string]interface{}
+	if json.Unmarshal(a, &ma) != nil || json.Unmarshal(b, &mb) != nil {
+		return false
+	}
+	keys := map[string]struct{}{}
+	for k := range ma {
+		keys[k] = struct{}{}
+	}
+	for k := range mb {
+		keys[k] = struct{}{}
+	}
+	var names []string
+	for k := range keys {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	for _, k := range names {
+		va, inA := ma[k]
+		vb, inB := mb[k]
+		switch {
+		case inA && !inB:
+			fmt.Printf("  %s\n", colorRed.Render("- "+k+": "+jsonVal(va)))
+		case !inA && inB:
+			fmt.Printf("  %s\n", colorGreen.Render("+ "+k+": "+jsonVal(vb)))
+		default:
+			sa, sb := jsonVal(va), jsonVal(vb)
+			if sa != sb {
+				fmt.Printf("  %s\n", colorYellow.Render("~ "+k+": "+sa+" → "+sb))
+			}
+		}
+	}
+	return true
+}
+
+func jsonVal(v interface{}) string {
+	if v == nil {
+		return "null"
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return fmt.Sprintf("%v", v)
+	}
+	return string(b)
 }
 
 func printBodySide(label string, b []byte) {

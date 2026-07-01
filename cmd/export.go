@@ -21,13 +21,13 @@ var exportLast int
 
 var exportCmd = &cobra.Command{
 	Use:   "export",
-	Short: "Export captures to HAR, JSON, or Postman collection",
-	Long:  "Export the last N captures to a single file. Format: json (default), har, or postman.",
+	Short: "Export captures to HAR, JSON, Postman collection, or bundle",
+	Long:  "Export the last N captures to a single file. Format: json (default), har, postman, or bundle.",
 	RunE:  runExport,
 }
 
 func init() {
-	exportCmd.Flags().StringVarP(&exportFormat, "format", "f", "json", "Format: json, har, or postman")
+	exportCmd.Flags().StringVarP(&exportFormat, "format", "f", "json", "Format: json, har, postman, or bundle")
 	exportCmd.Flags().IntVarP(&exportLast, "last", "n", 50, "")
 }
 
@@ -39,6 +39,11 @@ func runExport(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 	switch exportFormat {
+	case "bundle":
+		bundlePackOut = "export.snare"
+		bundlePackSession = ""
+		bundlePackIDs = ""
+		return runBundlePack(nil, nil)
 	case "har":
 		out := "export.har"
 		har := buildHAR(captures)
