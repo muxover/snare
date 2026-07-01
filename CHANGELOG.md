@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-07-01
+
+### Added
+
+- `snare test <suite.yaml>` — run a YAML test suite against a live server. Each test specifies a `url`, `method`, optional `headers` and `body`, and an `expect` block (`status`, `body_contains`, `body_not_contains`, `headers`). Exits 0 if all pass, 1 if any fail. `--proxy <url>` routes each request through the snare proxy so all test traffic is captured and inspectable. `--format junit` emits JUnit XML for GitHub Actions, Jenkins, and any CI test reporter. `--format tap` emits TAP output. `--parallel` runs all tests concurrently.
+- `snare assert --format junit` — existing assert command now supports `--format junit` to emit JUnit XML output. Useful for surfacing assert results in CI test dashboards without changing exit-code behaviour.
+- `snare diff --golden <name>` — snapshot the current session's captures as a named golden baseline stored in `~/.snare/golden/<name>.json`. Use `--session <name>` to specify which session to snapshot (defaults to the most recently completed session). `--strict` includes response bodies in the snapshot.
+- `snare diff --check <name>` — compare the current session against a named golden baseline. Reports missing, added, or changed requests (method, path, status code). `--strict` also compares response bodies. `--ignore-fields <k1,k2>` strips those top-level JSON keys from response bodies before comparing, useful for excluding volatile fields like timestamps or IDs. Exits 1 if any regression is found.
+- `snare fuzz <id>` — take a captured request and send N mutated variants to surface obvious input-handling gaps. Mutation strategies (all enabled by default): `--mutate-method` cycles all HTTP methods, `--mutate-path` tries traversal/parent/suffix variants, `--mutate-headers` removes or corrupts key headers, `--mutate-body` sends empty, null, overflowed, and field-deleted JSON variants. `--count <n>` caps variants sent (default: 20). `--proxy <url>` routes variants through snare. Output table highlights 5xx responses and status-class regressions.
+
 ## [2.2.0] - 2026-06-26
 
 ### Added
@@ -187,7 +197,8 @@ First release.
 - Body decompression (gzip, deflate, brotli) for readable captures.
 - Config via `SNARE_STORE`, `SNARE_CA` and serve flags (port, bind, max-captures).
 
-[Unreleased]: https://github.com/muxover/snare/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/muxover/snare/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/muxover/snare/releases/tag/v2.3.0
 [2.2.0]: https://github.com/muxover/snare/releases/tag/v2.2.0
 [2.1.0]: https://github.com/muxover/snare/releases/tag/v2.1.0
 [2.0.0]: https://github.com/muxover/snare/releases/tag/v2.0.0

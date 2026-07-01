@@ -145,12 +145,19 @@ No proxy env vars needed. All traffic to `127.0.0.1:8888` is forwarded to the ta
 | `snare record` | Record traffic to a cassette file for offline playback |
 | `snare playback <cassette>` | Replay a cassette file as an HTTP server |
 
+**Testing & CI**
+
+| Command | Description |
+|---------|-------------|
+| `snare test <suite.yaml>` | Run a YAML test suite; exits 1 on any failure |
+| `snare assert` | Assert conditions on captures; exits 1 on failure |
+| `snare fuzz <id>` | Send mutated variants of a captured request |
+
 **Automation**
 
 | Command | Description |
 |---------|-------------|
 | `snare pipe` | Stream captures as NDJSON; `--follow` to tail |
-| `snare assert` | Assert conditions on captures; exits 1 on failure |
 | `snare tui` | Interactive terminal UI — 4 tabs: Captures, Mocks, Intercept, Sessions |
 
 **CA**
@@ -303,6 +310,29 @@ plugins:
 
 ---
 
+## test Flags
+
+```
+    --proxy   Route requests through this proxy URL (captures test traffic in snare)
+    --format  Output format: text (default), junit, tap
+    --parallel Run tests concurrently
+```
+
+---
+
+## fuzz Flags
+
+```
+    --count           Maximum number of variants to send (default: 20)
+    --proxy           Route fuzz requests through a proxy URL
+    --mutate-body     Mutate JSON request body fields (default: true)
+    --mutate-headers  Mutate request headers (default: true)
+    --mutate-path     Mutate URL path segments (default: true)
+    --mutate-method   Cycle through HTTP methods (default: true)
+```
+
+---
+
 ## grep Flags
 
 ```
@@ -310,6 +340,32 @@ plugins:
 -v, --invert Print captures that do NOT match
 --method     Limit to this HTTP method
 --host       Limit to this host
+```
+
+---
+
+## assert Flags
+
+```
+    --method  Filter by HTTP method
+    --status  Filter by response status code
+    --url     Filter by URL substring
+    --body    Filter by substring in request or response body
+    --min     Minimum matching captures (default: 1)
+    --max     Maximum matching captures (-1 = no limit)
+    --format  Output format: text (default) or junit
+```
+
+---
+
+## diff Flags
+
+```
+    --golden <name>        Record current session as a named golden baseline
+    --check  <name>        Compare current session against a golden; exits 1 on regression
+    --session <name>       Session to use for --golden/--check (default: most recent)
+    --strict               Also compare response bodies when using --check
+    --ignore-fields <k,k>  Comma-separated response body JSON keys to ignore in --strict
 ```
 
 ---
@@ -449,6 +505,25 @@ snare serve --mode reverse --target http://localhost:3000 --no-h3
 
 # JS hook: inject a header and log all 5xx
 snare serve --hook hook.js
+
+# Run a YAML test suite (capture all traffic in snare)
+snare test suite.yaml --proxy http://127.0.0.1:8888
+
+# JUnit output for CI
+snare test suite.yaml --format junit > results.xml
+snare assert --url /api/health --status 200 --format junit > assert.xml
+
+# Record a golden baseline, then check regressions
+snare session start baseline
+# ... run tests ...
+snare session end baseline
+snare diff --golden baseline
+# ... deploy, run tests again ...
+snare diff --check baseline --strict --ignore-fields timestamp,request_id
+
+# Fuzz a captured request
+snare fuzz <id>
+snare fuzz <id> --proxy http://127.0.0.1:8888 --count 50
 
 # Diff two test runs
 snare session start baseline
